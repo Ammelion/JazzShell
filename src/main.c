@@ -44,7 +44,7 @@ int main(int argc, char *argv[]) {
           command=" ";
         }
         if (strcmp(commands[i], command)==0){
-          printf("%s is a shell bulletin\n",command);
+          printf("%s is a shell builtin\n",command);
           found=1;
           break;
         }
