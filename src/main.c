@@ -12,15 +12,48 @@ int main(int argc, char *argv[]) {
     fgets(input, 100, stdin);
     input[strlen(input) - 1] = '\0';
 
-    if(strcmp(input,"exit 0")==0){
-      return 0;
+    char *command=strtok(input," ");
+
+    if(strcmp(command,"exit")==0){
+      command=strtok(NULL," ");
+      if (!command) {
+        continue;
+      }
+      if (command && strcmp(command, "0") == 0) {
+        return 0;
+      }
     }
 
-    if(strncmp(input, "echo ", 5)==0){
-      printf("%s\n",input+5);
+    if(strcmp(command,"echo")==0){
+      while(command!=NULL){
+        command=strtok(NULL," ");
+        if (!command){break;}
+
+        printf("%s ",command);
+      }
+      printf("\n");
+      continue;
+    }
+
+    char *commands[]={"echo","exit"};
+    if(strcmp(command, "type")==0){
+      command=strtok(NULL," ");
+      int found=0;
+      for(int i=0;i<sizeof(commands)/sizeof(commands[0]);i++){
+        if (!command) {
+          command=" ";
+        }
+        if (strcmp(commands[i], command)==0){
+          printf("%s is a shell bulletin\n",command);
+          found=1;
+          break;
+        }
+      }
+      if(!found){printf("%s: not found\n",command);}
       continue;
     }
     printf("%s: command not found\n", input);
 
   }
 }
+
