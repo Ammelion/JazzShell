@@ -74,7 +74,7 @@ int main(int argc, char *argv[]) {
       continue;
     }
 
-    char *commands[]={"echo","exit","type"};
+    char *commands[]={"echo","exit","type","pwd"};
     if(strcmp(command, "type")==0){
       command=strtok(NULL," ");
       int found=0;
