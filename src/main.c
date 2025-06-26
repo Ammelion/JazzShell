@@ -1,18 +1,19 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 int main(int argc, char *argv[]) {
-  // Flush after every printf
   setbuf(stdout, NULL);
   while(1){
     printf("$ ");
-    // Wait for user input
+
     char input[100];
     fgets(input, 100, stdin);
     input[strlen(input) - 1] = '\0';
 
     char *command=strtok(input," ");
+    if(command==NULL){continue;}
 
     if(strcmp(command,"exit")==0){
       command=strtok(NULL," ");
@@ -49,8 +50,33 @@ int main(int argc, char *argv[]) {
           break;
         }
       }
-      if(!found){printf("%s: not found\n",command);}
-      continue;
+      if(found){continue;}
+
+      char *path = getenv("PATH");
+      if(!path){printf("%s: not found\n",command); continue;}
+
+      char *cp = strdup(path);
+      char *dir = strtok(cp, ":");
+      found=0;
+
+      while(dir){
+        char fp[300];
+        strcpy(fp,dir);
+        strcat(fp,"/");
+        strcat(fp,command);
+        if (access(fp, X_OK) == 0) {
+          printf("%s is %s\n",command,fp);
+          found=1;
+          break;
+        }
+        dir=strtok(NULL,":");
+      }
+    free(cp);
+    if(!found){
+      printf("%s: not found\n", command);
+    }
+    continue;
+
     }
     printf("%s: command not found\n", input);
 
