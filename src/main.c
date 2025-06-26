@@ -6,21 +6,34 @@
 #include <ctype.h>
 #include <errno.h>
 
+
 int parser(char *input, char *args[]){
-  int i=0,arg=0;
+  int i=0,arg=0,pos=0,tok=0;
+  char buf[300];
   while(input[i]){
-    while(isspace(input[i])) i++;
-    if(!input[i]) break;
-    if(input[i]=='\''||input[i]=='"'){
-      char quote=input[i++];
-      args[arg++]=&input[i];
-      while(input[i]&&input[i]!=quote) i++;
-      if(input[i]==quote) input[i++]='\0';
-    } else {
-      args[arg++]=&input[i];
-      while(input[i]&&!isspace((unsigned char)input[i])&&input[i]!='\''&&input[i]!='"') i++;
-      if(input[i]) input[i++]='\0';
+    if(isspace((unsigned char)input[i])){
+      if(tok){
+        buf[pos]='\0';
+        args[arg++]=strdup(buf);
+        pos=0;
+        tok=0;
+      }
+      i++;
     }
+    else if(input[i]=='\''||input[i]=='"'){
+      char q=input[i++];
+      tok=1;
+      while(input[i]&&input[i]!=q) buf[pos++]=input[i++];
+      if(input[i]==q) i++;
+    }
+    else {
+      tok=1;
+      buf[pos++]=input[i++];
+    }
+  }
+  if(tok){
+    buf[pos]='\0';
+    args[arg++]=strdup(buf);
   }
   args[arg]=NULL;
   return arg;
