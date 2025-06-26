@@ -74,7 +74,7 @@ int main(int argc, char *argv[]) {
       continue;
     }
 
-    char *commands[]={"echo","exit","type","pwd"};
+    char *commands[]={"echo","exit","type","pwd","cd"};
     if(strcmp(command, "type")==0){
       command=strtok(NULL," ");
       int found=0;
@@ -119,7 +119,14 @@ int main(int argc, char *argv[]) {
 
     if(strcmp(command,"cd")==0){
       char *target=strtok(NULL," ");
-      if(!target){continue;}
+      char *homenv=getenv("HOME");
+      char hcp[300]; strcpy(hcp,homenv);
+      if(!target){strcpy(target,homenv);}
+      if (strncmp(target,"~",1)==0){
+        strcat(hcp,target+1);
+        strcpy(target,hcp);
+      }
+
       if(chdir(target)==0){}
       else{printf("cd: %s: No such file or directory\n",target);}
 
