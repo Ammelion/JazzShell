@@ -117,9 +117,18 @@ int main(int argc, char *argv[]) {
 
     }
 
+    if(strcmp(command,"cd")==0){
+      char *target=strtok(NULL," ");
+      if(!target){continue;}
+      if(chdir(target)==0){}
+      else{printf("cd: %s: No such file or directory\n",target);}
+
+      continue;
+    }
+
     if(strcmp(command,"pwd")==0){
       if(strtok(NULL," ")){
-        printf("pwd: Too many arguements\n");
+        printf("pwd: Too many arguments\n");
         continue;
       }
       char cwd[500];
