@@ -116,6 +116,17 @@ int main(int argc, char *argv[]) {
     continue;
 
     }
+
+    if(strcmp(command,"pwd")==0){
+      if(strtok(NULL," ")){
+        printf("pwd: Too many arguements\n");
+        continue;
+      }
+      char cwd[500];
+      getcwd(cwd,sizeof(cwd));
+      printf("%s\n",cwd);
+      continue;
+    }
     
     char *args[100];
     int num=0;
@@ -131,6 +142,7 @@ int main(int argc, char *argv[]) {
     if(!i){
       printf("%s: command not found\n", input);
     }
+
   }
 }
 
