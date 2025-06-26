@@ -6,38 +6,45 @@
 #include <ctype.h>
 #include <errno.h>
 
-
 int parser(char *input, char *args[]){
-  int i=0,arg=0,pos=0,tok=0;
-  char buf[300];
+  int i=0,arg=0,pos=0;
+  char buf[1000];
+
   while(input[i]){
-    if(isspace((unsigned char)input[i])){
-      if(tok){
-        buf[pos]='\0';
-        args[arg++]=strdup(buf);
-        pos=0;
-        tok=0;
+    while(isspace((unsigned char)input[i])) i++;
+    if(!input[i]) break;
+
+    args[arg++]=&buf[pos];
+
+    if(input[i]=='"' || input[i]=='\''){
+      char quote=input[i++];
+      while(input[i] && input[i]!=quote){
+        if(input[i]=='\\' && input[i+1]){
+          buf[pos++]=input[i+1];
+          i+=2;
+        } else {
+          buf[pos++]=input[i++];
+        }
       }
-      i++;
+      if(input[i]==quote) i++;
+    } else {
+      while(input[i] && !isspace((unsigned char)input[i])){
+        if(input[i]=='\\' && input[i+1]){
+          buf[pos++]=input[i+1];
+          i+=2;
+        } else {
+          buf[pos++]=input[i++];
+        }
+      }
     }
-    else if(input[i]=='\''||input[i]=='"'){
-      char q=input[i++];
-      tok=1;
-      while(input[i]&&input[i]!=q) buf[pos++]=input[i++];
-      if(input[i]==q) i++;
-    }
-    else {
-      tok=1;
-      buf[pos++]=input[i++];
-    }
+
+    buf[pos++]='\0';
   }
-  if(tok){
-    buf[pos]='\0';
-    args[arg++]=strdup(buf);
-  }
+
   args[arg]=NULL;
   return arg;
 }
+
 
 int runexec(char **arr){
   int found=0;
