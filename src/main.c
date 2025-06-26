@@ -3,6 +3,28 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/wait.h>
+#include <ctype.h>
+#include <errno.h>
+
+int parser(char *input, char *args[]){
+  int i=0,arg=0;
+  while(input[i]){
+    while(isspace(input[i])) i++;
+    if(!input[i]) break;
+    if(input[i]=='\''||input[i]=='"'){
+      char quote=input[i++];
+      args[arg++]=&input[i];
+      while(input[i]&&input[i]!=quote) i++;
+      if(input[i]==quote) input[i++]='\0';
+    } else {
+      args[arg++]=&input[i];
+      while(input[i]&&!isspace((unsigned char)input[i])&&input[i]!='\''&&input[i]!='"') i++;
+      if(input[i]) input[i++]='\0';
+    }
+  }
+  args[arg]=NULL;
+  return arg;
+}
 
 int runexec(char **arr){
   int found=0;
@@ -11,12 +33,9 @@ int runexec(char **arr){
   char *path=getenv("PATH");
   char pcc[300]; strcpy(pcc,path);
   char *dir=strtok(pcc,":");
-
+  char cp[300];
   while(dir){
-    char cp[300];
-    strcpy(cp,dir);
-    strcat(cp,"/");
-    strcat(cp,command);
+    strcpy(cp,dir); strcat(cp,"/"); strcat(cp,command);
     if(access(cp,X_OK)==0){
       strcpy(pcc,cp);
       found=1;
@@ -24,141 +43,95 @@ int runexec(char **arr){
     }
     dir=strtok(NULL,":");
   }
-  if(!found){
-    return 0;
-  }
-
+  if(!found) return 0;
   int pid=fork();
   if(pid==0){
     execv(pcc,arr);
     perror("execv");
     exit(1);
-  }
-  else{
+  } else {
     wait(NULL);
     return 1;
   }
-
 }
 
-int main(int argc, char *argv[]) {
-  setbuf(stdout, NULL);
+int main(void){
+  setbuf(stdout,NULL);
+  char *args[100];
   while(1){
     printf("$ ");
-
     char input[100];
-    fgets(input, 100, stdin);
-    input[strlen(input) - 1] = '\0';
+    if(!fgets(input,100,stdin)) break;
+    input[strcspn(input,"\n")]='\0';
+    int nargs=parser(input,args);
+    if(nargs==0) continue;
+    char *cmd=args[0];
 
-    char *command=strtok(input," ");
-    if(command==NULL){continue;}
-
-    if(strcmp(command,"exit")==0){
-      command=strtok(NULL," ");
-      if (!command) {
-        continue;
-      }
-      if (command && strcmp(command, "0") == 0) {
-        return 0;
-      }
+    if(strcmp(cmd,"exit")==0){
+      if(nargs>1 && strcmp(args[1],"0")==0) break;
+      continue;
     }
 
-    if(strcmp(command,"echo")==0){
-      while(command!=NULL){
-        command=strtok(NULL," ");
-        if (!command){break;}
+    if(strcmp(cmd,"cd")==0){
 
-        printf("%s ",command);
+      char *target=nargs>1 ? args[1] : getenv("HOME");
+
+      if(!target) target="/";
+      if(target[0]=='~'){
+        char hcp[300]; strcpy(hcp,getenv("HOME")); strcat(hcp,target+1);
+        target=hcp;
+      }
+      if(chdir(target)!=0) fprintf(stderr,"cd: %s: %s\n",target,strerror(errno));
+      continue;
+    }
+
+    if(strcmp(cmd,"pwd")==0){
+      if(nargs>1){ printf("pwd: Too many arguments\n"); continue; }
+      char cwd[300];
+      if(getcwd(cwd,sizeof(cwd))) printf("%s\n",cwd);
+      continue;
+    }
+
+    if(strcmp(cmd,"echo")==0){
+      for(int i=1;i<nargs;i++){
+        printf("%s",args[i]);
+        if(i+1<nargs) printf(" ");
       }
       printf("\n");
       continue;
     }
 
-    char *commands[]={"echo","exit","type","pwd","cd"};
-    if(strcmp(command, "type")==0){
-      command=strtok(NULL," ");
-      int found=0;
-      for(int i=0;i<sizeof(commands)/sizeof(commands[0]);i++){
-        if (!command) {
-          command=" ";
-        }
-        if (strcmp(commands[i], command)==0){
-          printf("%s is a shell builtin\n",command);
-          found=1;
+    if(strcmp(cmd,"type")==0){
+      char *t=nargs>1?args[1]:NULL;
+      char *builtins[]={"echo","exit","type","pwd","cd"};
+      int fb=0;
+      for(int i=0;i<5;i++){
+        if(t&&strcmp(t,builtins[i])==0){
+          printf("%s is a shell builtin\n",t);
+          fb=1;
           break;
         }
       }
-      if(found){continue;}
-
-      char *path = getenv("PATH");
-      if(!path){printf("%s: not found\n",command); continue;}
-
-      char *cp = strdup(path);
-      char *dir = strtok(cp, ":");
-      found=0;
-
+      if(fb) continue;
+      char *p2=getenv("PATH");
+      char *cp2=strdup(p2);
+      char *dir=strtok(cp2,":");
+      int fe=0;
       while(dir){
-        char fp[300];
-        strcpy(fp,dir);
-        strcat(fp,"/");
-        strcat(fp,command);
-        if (access(fp,X_OK)==0){
-          printf("%s is %s\n",command,fp);
-          found=1;
+        char fp[300]; strcpy(fp,dir); strcat(fp,"/"); strcat(fp,t?t:"");
+        if(t&&access(fp,X_OK)==0){
+          printf("%s is %s\n",t,fp);
+          fe=1;
           break;
         }
         dir=strtok(NULL,":");
       }
-    free(cp);
-    if(!found){
-      printf("%s: not found\n", command);
-    }
-    continue;
-
-    }
-
-    if(strcmp(command,"cd")==0){
-      char *target=strtok(NULL," ");
-      char *homenv=getenv("HOME");
-      char hcp[300]; strcpy(hcp,homenv);
-      if(!target){strcpy(target,homenv);}
-      if (strncmp(target,"~",1)==0){
-        strcat(hcp,target+1);
-        strcpy(target,hcp);
-      }
-
-      if(chdir(target)==0){}
-      else{printf("cd: %s: No such file or directory\n",target);}
-
+      free(cp2);
+      if(!fe) printf("%s: not found\n",t?t:"");
       continue;
     }
 
-    if(strcmp(command,"pwd")==0){
-      if(strtok(NULL," ")){
-        printf("pwd: Too many arguments\n");
-        continue;
-      }
-      char cwd[500];
-      getcwd(cwd,sizeof(cwd));
-      printf("%s\n",cwd);
-      continue;
-    }
-    
-    char *args[100];
-    int num=0;
-
-    while(command!=NULL){
-      args[num]=command;
-      command=strtok(NULL," ");
-      num++;
-    }
-    args[num] = NULL; 
-
-    int i=runexec(args);
-    if(!i){
-      printf("%s: command not found\n", input);
-    }
-
+    if(!runexec(args)) printf("%s: command not found\n",cmd);
   }
+  return 0;
 }
-
