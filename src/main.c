@@ -2,6 +2,44 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/wait.h>
+
+int runexec(char **arr){
+  int found=0;
+  char command[100];
+  strcpy(command,arr[0]);
+  char *path=getenv("PATH");
+  char pcc[300]; strcpy(pcc,path);
+  char *dir=strtok(pcc,":");
+
+  while(dir){
+    char cp[300];
+    strcpy(cp,dir);
+    strcat(cp,"/");
+    strcat(cp,command);
+    if(access(cp,X_OK)==0){
+      strcpy(pcc,cp);
+      found=1;
+      break;
+    }
+    dir=strtok(NULL,":");
+  }
+  if(!found){
+    return 0;
+  }
+
+  int pid=fork();
+  if(pid==0){
+    execv(pcc,arr);
+    perror("execv");
+    exit(1);
+  }
+  else{
+    wait(NULL);
+    return 1;
+  }
+
+}
 
 int main(int argc, char *argv[]) {
   setbuf(stdout, NULL);
@@ -64,7 +102,7 @@ int main(int argc, char *argv[]) {
         strcpy(fp,dir);
         strcat(fp,"/");
         strcat(fp,command);
-        if (access(fp, X_OK) == 0) {
+        if (access(fp,X_OK)==0){
           printf("%s is %s\n",command,fp);
           found=1;
           break;
@@ -78,8 +116,21 @@ int main(int argc, char *argv[]) {
     continue;
 
     }
-    printf("%s: command not found\n", input);
+    
+    char *args[100];
+    int num=0;
 
+    while(command!=NULL){
+      args[num]=command;
+      command=strtok(NULL," ");
+      num++;
+    }
+    args[num] = NULL; 
+
+    int i=runexec(args);
+    if(!i){
+      printf("%s: command not found\n", input);
+    }
   }
 }
 
