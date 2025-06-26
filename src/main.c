@@ -5,34 +5,46 @@
 #include <sys/wait.h>
 #include <ctype.h>
 #include <errno.h>
-
 int parser(char *input, char *args[]) {
-  static char buf[1000]; // Safe static buffer
-  int i=0, arg=0, pos=0;
+  static char buf[1000];
+  int i=0,pos=0,arg=0;
 
-  while(input[i]) {
+  while(input[i]){
     while(isspace((unsigned char)input[i])) i++;
     if(!input[i]) break;
 
     args[arg++] = &buf[pos];
 
-    if(input[i] == '\'' || input[i] == '"') {
-      char quote = input[i++];
-      while(input[i] && input[i] != quote) {
-        if(input[i] == '\\' && input[i+1]) {
-          buf[pos++] = input[i+1];
-          i += 2;
-        } else {
+    if(input[i]=='\''){
+      i++;
+      while(input[i] && input[i]!='\''){
+        buf[pos++] = input[i++];
+      }
+      if(input[i]=='\'') i++;
+    }
+    else if(input[i]=='"'){
+      i++;
+      while(input[i] && input[i]!='"'){
+        if(input[i]=='\\' && input[i+1]){
+          if(strchr("\"\\$`",input[i+1])){
+            buf[pos++] = input[i+1]; i+=2;
+          }
+          else{
+            buf[pos++] = input[i++];
+          }
+        }
+        else{
           buf[pos++] = input[i++];
         }
       }
-      if(input[i] == quote) i++;
-    } else {
-      while(input[i] && !isspace((unsigned char)input[i])) {
-        if(input[i] == '\\' && input[i+1]) {
-          buf[pos++] = input[i+1];
-          i += 2;
-        } else {
+      if(input[i]=='"') i++;
+    }
+    else{
+      while(input[i] && !isspace((unsigned char)input[i])){
+        if(input[i]=='\\' && input[i+1]){
+          buf[pos++] = input[i+1]; i+=2;
+        }
+        else{
           buf[pos++] = input[i++];
         }
       }
