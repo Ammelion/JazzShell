@@ -26,10 +26,10 @@ int parser(char *input, char *args[]){
           inquote=0;
         }
         i++;
-    }
+      }
     input[i-1]='\0';
     continue;
-    
+
     }
     if(input[i]=='"'){
       inquote=1;
@@ -38,13 +38,19 @@ int parser(char *input, char *args[]){
       countarg++;
 
       while(inquote && input[i]){
-        if(input[i]=='\\' && input[i+1] && (input[i+1]=='"'||input[i+1]=='\\' || input[i+1]=='\'')){
-          memmove(&input[i],&input[i+1],strlen(&input[i]));
+        if(input[i]=='\\' && input[i+1]){
+          if(input[i+1]=='"'||input[i+1]=='\\'||input[i+1]=='$'||input[i+1]=='`'){
+            memmove(&input[i], &input[i+1], strlen(&input[i]));
+            i++;
+          } else {
+            i += 2;
+            continue;
+          }
         }
         else if(input[i]=='"'){
           inquote=0;
         }
-      i++;
+        i++;
       }
     input[i-1]='\0';
     continue;
