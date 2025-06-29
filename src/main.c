@@ -38,7 +38,10 @@ int parser(char *input, char *args[]){
       countarg++;
 
       while(inquote && input[i]){
-        if(input[i]=='"'){
+        if(input[i]=='\\' && input[i+1]){
+          memmove(&input[i],&input[i+1],strlen(&input[i]));
+        }
+        else if(input[i]=='"'){
           inquote=0;
         }
       i++;
