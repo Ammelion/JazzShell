@@ -8,41 +8,68 @@
 
 int parser(char *input, char *args[]) {
     int count = 0;
-    char *p = input;
+    char *read = input, *write = input, *arg_start = NULL;
+    int in_single = 0, in_double = 0;
 
-    while (*p) {
-        while (*p == ' ') p++;
-        if (!*p) break;
-        args[count++] = p;
-        char *out = p;
-        while (*p && *p != ' ') {
-            if (*p == '"') {
-                p++;
-                while (*p && *p != '"') {
-                    if (*p == '\\' && p[1]) p++;
-                    *out++ = *p++;
-                }
-                if (*p == '"') p++;
-            } else if (*p == '\'') {
-                p++;
-                while (*p && *p != '\'') {
-                    *out++ = *p++;
-                }
-                if (*p == '\'') p++;
-            } else if (*p == '\\' && p[1]) {
-                p++;
-                *out++ = *p++;
+    while (*read) {
+        char c = *read;
+        if (in_single) {
+            if (c == '\'') {
+                in_single = 0;
             } else {
-                *out++ = *p++;
+                *write++ = c;
+            }
+        } else if (in_double) {
+            if (c == '"') {
+                in_double = 0;
+            } else if (c == '\\' && read[1]) {
+                read++;
+                *write++ = *read;
+            } else {
+                *write++ = c;
+            }
+        } else {
+            if (c == '\'') {
+                in_single = 1;
+                if (!arg_start) {
+                    arg_start = write;
+                    args[count++] = arg_start;
+                }
+            } else if (c == '"') {
+                in_double = 1;
+                if (!arg_start) {
+                    arg_start = write;
+                    args[count++] = arg_start;
+                }
+            } else if (c == '\\' && read[1]) {
+                read++;
+                if (!arg_start) {
+                    arg_start = write;
+                    args[count++] = arg_start;
+                }
+                *write++ = *read;
+            } else if (isspace((unsigned char)c)) {
+                if (arg_start) {
+                    *write++ = '\0';
+                    arg_start = NULL;
+                }
+            } else {
+                if (!arg_start) {
+                    arg_start = write;
+                    args[count++] = arg_start;
+                }
+                *write++ = c;
             }
         }
-        *out = '\0';
-        p++;
+        read++;
+    }
+
+    if (arg_start) {
+        *write++ = '\0';
     }
     args[count] = NULL;
     return count;
 }
-
 
 
 
