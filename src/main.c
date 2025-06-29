@@ -39,8 +39,12 @@ int parser(char *input, char *args[]){
 
       while(inquote && input[i]){
         if(input[i]=='\\' && input[i+1]){
-          memmove(&input[i], &input[i+1], strlen(&input[i]));
-          i++;
+          // Only escape ", \, $, `
+          if(input[i+1]=='"'||input[i+1]=='\\'||input[i+1]=='$'||input[i+1]=='`'){
+            memmove(&input[i], &input[i+1], strlen(&input[i]));
+          } else {
+            i++;
+          }
         }
         else if(input[i]=='"'){
           inquote=0;
@@ -50,14 +54,14 @@ int parser(char *input, char *args[]){
     input[i-1]='\0';
     continue;
     }
+
     args[countarg]=&input[i];
     countarg++;
 
     while(input[i] &&input[i]!=' '){
-      if (input[i]=='\\'&&input[i+1]){
-        memmove(&input[i],&input[i+1],strlen(&input[i]));
-        i++;
-      }else{
+      if (input[i]=='\\' && input[i+1]){
+        memmove(&input[i], &input[i+1], strlen(&input[i]));
+      } else {
         i++;
       }
     }
