@@ -7,16 +7,12 @@
 #include <errno.h>
 
 int parser(char *input, char *args[]){
-  for(int k=0; input[k];k++){
-    if(input[k] == '\\' && input[k+1]){
-        input[k]=input[k+1];
-        memmove(&input[k+1],&input[k+2],strlen(input) - (k+1));
-    }
-  }
   int countarg=0,i=0;
   int inquote=0;
 
-  while(input[i] && input[i]==' '){i++;}
+  while(input[i] && input[i]==' '){
+    i++;
+  }
 
   while(input[i]){
     if(input[i]=='\''){
@@ -47,21 +43,24 @@ int parser(char *input, char *args[]){
         }
       i++;
     }
-  input[i-1]='\0';
-  continue;
-  }
-
-
+    input[i-1]='\0';
+    continue;
+    }
     args[countarg]=&input[i];
     countarg++;
 
-    while(input[i] && input[i]!=' '){
-      i++;
+    while(input[i] &&input[i] != ' '){
+      if (input[i]=='\\' &&input[i+1]){
+        memmove(&input[i], &input[i+1],strlen(&input[i]));
+        i++;
+      }else{
+        i++;
+      }
     }
 
     if(input[i]) {
       input[i++] = '\0';
-      while (input[i] && input[i] == ' '){
+      while (input[i] &&input[i] == ' '){
         i++;
       }
     }
