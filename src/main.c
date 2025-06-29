@@ -38,7 +38,7 @@ int parser(char *input, char *args[]){
       countarg++;
 
       while(inquote && input[i]){
-        if(input[i]=='\\' && input[i+1]){
+        if(input[i]=='\\' && input[i+1] && (input[i+1]=='"'||input[i+1]=='\\' || input[i+1]=='\'')){
           memmove(&input[i],&input[i+1],strlen(&input[i]));
         }
         else if(input[i]=='"'){
@@ -52,9 +52,9 @@ int parser(char *input, char *args[]){
     args[countarg]=&input[i];
     countarg++;
 
-    while(input[i] &&input[i] != ' '){
-      if (input[i]=='\\' &&input[i+1]){
-        memmove(&input[i], &input[i+1],strlen(&input[i]));
+    while(input[i] &&input[i]!=' '){
+      if (input[i]=='\\'&&input[i+1]){
+        memmove(&input[i],&input[i+1],strlen(&input[i]));
         i++;
       }else{
         i++;
@@ -63,13 +63,13 @@ int parser(char *input, char *args[]){
 
     if(input[i]) {
       input[i++] = '\0';
-      while (input[i] &&input[i] == ' '){
+      while (input[i] &&input[i]==' '){
         i++;
       }
     }
   }
 
-  args[countarg] = NULL;
+  args[countarg]=NULL;
   return countarg;
 }
 
