@@ -7,69 +7,51 @@
 #include <errno.h>
 
 int parser(char *input, char *args[]) {
-    int count = 0;
-    char *read = input, *write = input, *arg_start = NULL;
-    int in_single = 0, in_double = 0;
+    int count = 0, in_single = 0, in_double = 0;
+    char *read = input, *write = input, *token = NULL;
 
     while (*read) {
         char c = *read;
         if (in_single) {
-            if (c == '\'') {
-                in_single = 0;
-            } else {
-                *write++ = c;
-            }
+            if (c == '\'') in_single = 0;
+            else *write++ = c;
+            read++;
         } else if (in_double) {
-            if (c == '"') {
-                in_double = 0;
-            } else if (c == '\\' && read[1]) {
-                read++;
-                *write++ = *read;
-            } else {
-                *write++ = c;
-            }
+            if (c == '"') in_double = 0;
+            else *write++ = c;
+            read++;
         } else {
             if (c == '\'') {
                 in_single = 1;
-                if (!arg_start) {
-                    arg_start = write;
-                    args[count++] = arg_start;
-                }
+                if (!token) { token = write; args[count++] = token; }
+                read++;
             } else if (c == '"') {
                 in_double = 1;
-                if (!arg_start) {
-                    arg_start = write;
-                    args[count++] = arg_start;
-                }
-            } else if (c == '\\' && read[1]) {
+                if (!token) { token = write; args[count++] = token; }
                 read++;
-                if (!arg_start) {
-                    arg_start = write;
-                    args[count++] = arg_start;
-                }
-                *write++ = *read;
+            } else if (c == '\\' && read[1]) {
+                if (!token) { token = write; args[count++] = token; }
+                read++;
+                *write++ = *read++;
             } else if (isspace((unsigned char)c)) {
-                if (arg_start) {
+                if (token) {
                     *write++ = '\0';
-                    arg_start = NULL;
+                    token = NULL;
                 }
+                read++;
             } else {
-                if (!arg_start) {
-                    arg_start = write;
-                    args[count++] = arg_start;
-                }
+                if (!token) { token = write; args[count++] = token; }
                 *write++ = c;
+                read++;
             }
         }
-        read++;
     }
 
-    if (arg_start) {
-        *write++ = '\0';
-    }
+    if (token) *write++ = '\0';
     args[count] = NULL;
     return count;
 }
+
 
 
 
