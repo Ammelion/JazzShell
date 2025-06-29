@@ -5,88 +5,42 @@
 #include <sys/wait.h>
 #include <ctype.h>
 #include <errno.h>
+
 int parser(char *input, char *args[]) {
-  int countarg=0, i=0;
-  int inquote=0;
-  int mergeFlags[100] = {0};  /* CHANGED: track which args came from adjacent quotes */
+    int count = 0;
+    char *p = input;
 
-  while(input[i] && input[i]==' '){i++;}
-
-  i=0; inquote=0;
-  while(input[i]){
-    if(input[i]=='\''){
-      inquote=1;
-      i++;
-      if(input[i]){
-        args[countarg]=&input[i];
-        countarg++;
-      }
-      while(inquote && input[i]){
-        if(input[i]=='\'') inquote=0;
-        i++;
-      }
-      input[i-1]='\0';
-      continue;
-    }
-    if(input[i]=='"'){
-      inquote=1;
-      i++;
-      if(input[i]){
-        /* CHANGED: if this quote is immediately after another quote, mark for merge */
-        if(i>0 && input[i-1]=='"') {
-          args[countarg]=&input[i];
-          mergeFlags[countarg]=1;
-          countarg++;
-        } else {
-          args[countarg]=&input[i];
-          countarg++;
+    while (*p) {
+        while (*p == ' ') p++;
+        if (!*p) break;
+        args[count++] = p;
+        char *out = p;
+        while (*p && *p != ' ') {
+            if (*p == '"') {
+                p++;
+                while (*p && *p != '"') {
+                    if (*p == '\\' && p[1]) p++;
+                    *out++ = *p++;
+                }
+                if (*p == '"') p++;
+            } else if (*p == '\'') {
+                p++;
+                while (*p && *p != '\'') {
+                    *out++ = *p++;
+                }
+                if (*p == '\'') p++;
+            } else if (*p == '\\' && p[1]) {
+                p++;
+                *out++ = *p++;
+            } else {
+                *out++ = *p++;
+            }
         }
-      }
-      while(inquote && input[i]){
-        if(input[i]=='"') inquote=0;
-        i++;
-      }
-      input[i-1]='\0';
-      continue;
+        *out = '\0';
+        p++;
     }
-    if(input[i] && input[i]!=' '){
-      args[countarg]=&input[i];
-      countarg++;
-    }
-    while((input[i] && input[i]!=' ') || inquote){
-      if(!inquote && input[i]=='\\' && input[i+1]){
-        int k=i;
-        while(input[k]){
-          input[k]=input[k+1];
-          k++;
-        }
-        i++;
-        continue;
-      }
-      i++;
-    }
-    if(input[i]) {
-      input[i++]='\0';
-      while(input[i] && input[i]==' ') i++;
-    }
-  }
-
-  /* CHANGED: only merge when flagged as adjacent-quote */
-  for(int j=0; j < countarg-1; j++){
-    if( mergeFlags[j+1]
-        && args[j+1] == args[j] + strlen(args[j]) + 1 ) {
-      strcat(args[j], args[j+1]);
-      for(int k=j+1; k < countarg; k++){
-        args[k] = args[k+1];
-        mergeFlags[k] = mergeFlags[k+1];
-      }
-      countarg--;
-      j--;  
-    }
-  }
-
-  args[countarg]=NULL;
-  return countarg;
+    args[count] = NULL;
+    return count;
 }
 
 
