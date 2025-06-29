@@ -6,55 +6,79 @@
 #include <ctype.h>
 #include <errno.h>
 
-int parser(char *input, char *args[]){
-  int countarg=0, i=0, j=0;
-  int in_single_quote=0, in_double_quote=0;
-  char buf[1000]; // internal buffer for final parsed string
+int parser(char *input, char *args[]) {
+  int countarg=0,i=0;
+  int inquote=0;
+  char c;
 
-  while (input[i] && input[i]==' ') i++;
+  while(input[i] && input[i]==' '){i++;}
 
-  while (input[i]) {
-    args[countarg] = &buf[j];
-    countarg++;
+  i=0;inquote=0;
+  while(input[i]){
+    if(input[i]=='\''){
+      inquote=1;
+      i++;
 
-    while (input[i] &&
-           (in_single_quote || in_double_quote || input[i] != ' ')) {
-      if (!in_single_quote && !in_double_quote && input[i] == '\\' && input[i+1]) {
-        buf[j++] = input[++i]; i++;
-        continue;
+      if(input[i]){
+        args[countarg]=&input[i];
+        countarg++;
       }
 
-      if (!in_single_quote && input[i] == '"') {
-        in_double_quote = !in_double_quote;
-        i++;
-        continue;
-      }
-
-      if (!in_double_quote && input[i] == '\'') {
-        in_single_quote = !in_single_quote;
-        i++;
-        continue;
-      }
-
-      if (in_double_quote && input[i] == '\\' && input[i+1]) {
-        if (input[i+1] == '"' || input[i+1] == '\\' || input[i+1] == '$' || input[i+1] == '`') {
-          buf[j++] = input[i+1];
-          i += 2;
-          continue;
+      while(inquote && input[i]){
+        if(input[i]=='\''){
+          inquote=0;
         }
+        i++;
       }
-
-      buf[j++] = input[i++];
+      input[i-1]='\0';
+      continue;
+    }
+    if(input[i]=='"'){
+      inquote=1;
+      i++;
+      if(input[i]){
+        args[countarg]=&input[i];
+        countarg++;
+      }
+      while(inquote && input[i]){
+        if(input[i]=='"'){
+          inquote=0;
+        }
+      i++;
     }
 
-    buf[j++] = '\0';
+    input[i-1]='\0';
+    continue;
+    }
+    if(input[i] && input[i]!=' '){
+      args[countarg]=&input[i];
+      countarg++;
+    }
+    while(input[i] && input[i]!=' ' || inquote){
+      if(!inquote && input[i] == '\\' && input[i+1]){
+        int k=i;
+        while(input[k]){ 
+          input[k] = input[k+1];
+          k++;
+        }
+        i++;
+        continue;
+      }
+      i++;
+    }
 
-    while (input[i] && input[i] == ' ') i++;
+    if(input[i]) {
+      input[i++] = '\0';
+      while (input[i] && input[i] == ' '){
+        i++;
+      }
+    }
   }
 
   args[countarg] = NULL;
   return countarg;
 }
+
 
 
 int runexec(char **arr){
