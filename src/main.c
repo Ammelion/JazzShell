@@ -5,56 +5,70 @@
 #include <sys/wait.h>
 #include <ctype.h>
 #include <errno.h>
-int parser(char *input, char *args[]) {
-  static char buf[1000];
-  int i=0,pos=0,arg=0;
+
+int parser(char *input, char *args[]){
+  for(int k=0; input[k];k++){
+    if(input[k] == '\\' && input[k+1]){
+        input[k]=input[k+1];
+        memmove(&input[k+1],&input[k+2],strlen(input) - (k+1));
+    }
+  }
+  int countarg=0,i=0;
+  int inquote=0;
+
+  while(input[i] && input[i]==' '){i++;}
 
   while(input[i]){
-    while(isspace((unsigned char)input[i])) i++;
-    if(!input[i]) break;
-
-    args[arg++] = &buf[pos];
-
     if(input[i]=='\''){
+      inquote=1;
       i++;
-      while(input[i] && input[i]!='\''){
-        buf[pos++] = input[i++];
-      }
-      if(input[i]=='\'') i++;
-    }
-    else if(input[i]=='"'){
-      i++;
-      while(input[i] && input[i]!='"'){
-        if(input[i]=='\\' && input[i+1]){
-          if(strchr("\"\\$`",input[i+1])){
-            buf[pos++] = input[i+1]; i+=2;
-          }
-          else{
-            buf[pos++] = input[i++];
-          }
-        }
-        else{
-          buf[pos++] = input[i++];
-        }
-      }
-      if(input[i]=='"') i++;
-    }
-    else{
-      while(input[i] && !isspace((unsigned char)input[i])){
-        if(input[i]=='\\' && input[i+1]){
-          buf[pos++] = input[i+1]; i+=2;
-        }
-        else{
-          buf[pos++] = input[i++];
-        }
-      }
-    }
+      args[countarg]=&input[i];
+      countarg++;
 
-    buf[pos++] = '\0';
+      while(inquote && input[i]){
+        if(input[i]=='\''){
+          inquote=0;
+        }
+        i++;
+    }
+    input[i-1]='\0';
+    continue;
+    
+    }
+    if(input[i]=='"'){
+      inquote=1;
+      i++;
+      args[countarg]=&input[i];
+      countarg++;
+
+      while(inquote && input[i]){
+        if(input[i]=='"'){
+          inquote=0;
+        }
+      i++;
+    }
+  input[i-1]='\0';
+  continue;
   }
 
-  args[arg] = NULL;
-  return arg;
+
+    args[countarg]=&input[i];
+    countarg++;
+
+    while(input[i] && input[i]!=' '){
+      i++;
+    }
+
+    if(input[i]) {
+      input[i++] = '\0';
+      while (input[i] && input[i] == ' '){
+        i++;
+      }
+    }
+  }
+
+  args[countarg] = NULL;
+  return countarg;
 }
 
 
@@ -66,8 +80,11 @@ int runexec(char **arr){
   char pcc[300]; strcpy(pcc,path);
   char *dir=strtok(pcc,":");
   char cp[300];
+
   while(dir){
-    strcpy(cp,dir); strcat(cp,"/"); strcat(cp,command);
+    strcpy(cp,dir); 
+    strcat(cp,"/"); 
+    strcat(cp,command);
     if(access(cp,X_OK)==0){
       strcpy(pcc,cp);
       found=1;
@@ -75,6 +92,7 @@ int runexec(char **arr){
     }
     dir=strtok(NULL,":");
   }
+
   if(!found) return 0;
   int pid=fork();
   if(pid==0){
@@ -110,7 +128,9 @@ int main(void){
 
       if(!target) target="/";
       if(target[0]=='~'){
-        char hcp[300]; strcpy(hcp,getenv("HOME")); strcat(hcp,target+1);
+        char hcp[300]; 
+        strcpy(hcp,getenv("HOME")); 
+        strcat(hcp,target+1);
         target=hcp;
       }
       if(chdir(target)!=0) fprintf(stderr,"cd: %s: %s\n",target,strerror(errno));
