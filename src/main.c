@@ -22,26 +22,22 @@ int parser(char *input, char *args[]){
                 *write++=c;
             }
             read++;
-
         }
         else if(idouble){
             if (c=='"'){
-                idouble= 0;
+                idouble=0;
                 read++;
             }
-            else if (c=='\\' &&(read[1]=='"'|| read[1]=='\\'||read[1]=='$'
-                                || read[1]=='`'|| read[1]=='\n')){
+            else if (c=='\\' && (read[1]=='"'||read[1]=='\\'||read[1]=='$'
+                                 ||read[1]=='`'||read[1]=='\n')){
                 read++;
-                if(*read!='\n'){
-                    *write++=*read;
-                }
+                if(*read!='\n') *write++=*read;
                 read++;
             }
             else {
                 *write++=c;
                 read++;
             }
-
         }
         else{
             if(c=='\''){
@@ -52,15 +48,15 @@ int parser(char *input, char *args[]){
                 }
                 read++;
             }
-            else if(c == '"'){
+            else if(c=='"'){
                 idouble=1;
-                if (!token){
+                if(!token){
                     token=write;
                     args[count++]=token;
                 }
                 read++;
             }
-            else if(c=='\\'&&read[1]){
+            else if(c=='\\' && read[1]){
                 if(!token){
                     token=write;
                     args[count++]=token;
@@ -85,9 +81,7 @@ int parser(char *input, char *args[]){
             }
         }
     }
-    if (token){
-        *write++= '\0';
-    }
+    if(token) *write++='\0';
     args[count]=NULL;
     return count;
 }
@@ -112,26 +106,27 @@ int runexec(char **arr, int stream, char *red_op, char *red_file){
         }
         dir=strtok(NULL,":");
     }
-
     if(!found) return 0;
+
     int pid=fork();
-    if (pid==0){
-        if (red_file){
-            int fd=open(red_file, O_WRONLY|O_CREAT|O_TRUNC,0666);
-            if (fd<0){
+    if(pid==0){
+        if(red_file){
+            int flags = O_WRONLY|O_CREAT
+                      | (strstr(red_op, ">>") ? O_APPEND : O_TRUNC);
+            int fd=open(red_file, flags, 0666);
+            if(fd<0){
                 perror(red_file);
                 exit(1);
             }
             dup2(fd,stream);
-            if (strcmp(red_op, "&>")==0)
+            if(strcmp(red_op,"&>")==0 || strcmp(red_op,"&>>")==0)
                 dup2(fd,2);
             close(fd);
         }
-        execv(pcc, arr);
+        execv(pcc,arr);
         perror("execv");
         exit(1);
-    }
-    else {
+    } else {
         wait(NULL);
         return 1;
     }
@@ -144,51 +139,56 @@ int main(void){
         printf("$ ");
         char input[100];
         if(!fgets(input,100,stdin)) break;
-        input[strcspn(input,"\n")]='\0';
-        int nargs=parser(input,args);
+        input[strcspn(input,"\n")] = '\0';
+        int nargs = parser(input,args);
         if(nargs==0) continue;
-        char *cmd=args[0];
+        char *cmd = args[0];
 
-        int stream=-1;
-        int index=-1;
-        char *red_file=NULL;
-        char *red_op=NULL;
+        int stream=-1, index=-1;
+        char *red_file=NULL, *red_op=NULL;
         for(int i=0; args[i]; i++){
-            if(strcmp(args[i],">")==0 || strcmp(args[i],"1>")==0){
-                stream=1; index=i;
-                red_op  = args[i];
-                red_file=args[i+1];
+            if(strcmp(args[i],">")==0   || strcmp(args[i],"1>")==0  ||
+               strcmp(args[i],">>")==0  || strcmp(args[i],"1>>")==0 )
+            {
+                stream   = 1;
+                index    = i;
+                red_op   = args[i];
+                red_file = args[i+1];
                 break;
             }
-            if(strcmp(args[i],"2>")==0){
-                stream=2; index=i;
-                red_op  = args[i];
-                red_file=args[i+1];
+            if(strcmp(args[i],"2>")==0  || strcmp(args[i],"2>>")==0 ){
+                stream   = 2;
+                index    = i;
+                red_op   = args[i];
+                red_file = args[i+1];
                 break;
             }
-            if(strcmp(args[i],"&>")==0){
-                stream=1; index=i;
-                red_op  = args[i];
-                red_file=args[i+1];
+            if(strcmp(args[i],"&>")==0  || strcmp(args[i],"&>>")==0 ){
+                stream   = 1;
+                index    = i;
+                red_op   = args[i];
+                red_file = args[i+1];
                 break;
             }
         }
 
         int builtin_saved=-1;
-        if (red_file){
-            int fd=open(red_file, O_WRONLY|O_CREAT|O_TRUNC,0666);
-            if (fd<0){
+        if(red_file){
+            int flags = O_WRONLY|O_CREAT
+                      | (strstr(red_op, ">>") ? O_APPEND : O_TRUNC);
+            int fd = open(red_file, flags, 0666);
+            if(fd<0){
                 perror(red_file);
             } else {
                 builtin_saved=dup(stream);
                 dup2(fd,stream);
-                if (strcmp(red_op,"&>")==0)
+                if(strcmp(red_op,"&>")==0 || strcmp(red_op,"&>>")==0)
                     dup2(fd,2);
                 close(fd);
             }
         }
 
-        if (index!=-1){
+        if(index!=-1){
             args[index]=NULL;
             nargs = index;
         }
@@ -197,7 +197,7 @@ int main(void){
             if(nargs>1 && strcmp(args[1],"0")==0) break;
         }
         else if(strcmp(cmd,"cd")==0){
-            char *target=nargs>1 ? args[1] : getenv("HOME");
+            char *target = nargs>1 ? args[1] : getenv("HOME");
             if(!target) target="/";
             if(target[0]=='~'){
                 char hcp[300];
@@ -209,9 +209,8 @@ int main(void){
                 fprintf(stderr,"cd: %s: %s\n",target,strerror(errno));
         }
         else if(strcmp(cmd,"pwd")==0){
-            if(nargs>1){
-                printf("pwd: Too many arguments\n");
-            } else {
+            if(nargs>1) printf("pwd: Too many arguments\n");
+            else {
                 char cwd[300];
                 if(getcwd(cwd,sizeof(cwd)))
                     printf("%s\n",cwd);
@@ -225,7 +224,7 @@ int main(void){
             printf("\n");
         }
         else if(strcmp(cmd,"type")==0){
-            char *t=nargs>1?args[1]:NULL;
+            char *t = nargs>1 ? args[1] : NULL;
             char *builtins[]={"echo","exit","type","pwd","cd"};
             int fb=0;
             for(int i=0;i<5;i++){
@@ -236,30 +235,30 @@ int main(void){
                 }
             }
             if(!fb){
-                char *p2=getenv("PATH");
-                char *cp2=strdup(p2);
-                char *dir=strtok(cp2,":");
+                char *p2 = getenv("PATH");
+                char *cp2 = strdup(p2);
+                char *d  = strtok(cp2,":");
                 int fe=0;
-                while(dir){
+                while(d){
                     char fp[300];
-                    strcpy(fp,dir); strcat(fp,"/"); strcat(fp,t?t:"");
+                    strcpy(fp,d); strcat(fp,"/"); strcat(fp,t?t:"");
                     if(t&&access(fp,X_OK)==0){
                         printf("%s is %s\n",t,fp);
                         fe=1;
                         break;
                     }
-                    dir=strtok(NULL,":");
+                    d=strtok(NULL,":");
                 }
                 free(cp2);
                 if(!fe) printf("%s: not found\n",t?t:"");
             }
         }
         else {
-            if(!runexec(args, stream, red_op, red_file))
+            if(!runexec(args,stream,red_op,red_file))
                 printf("%s: command not found\n",cmd);
         }
 
-        if (builtin_saved!=-1){
+        if(builtin_saved!=-1){
             dup2(builtin_saved,stream);
             close(builtin_saved);
         }
