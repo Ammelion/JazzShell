@@ -188,9 +188,10 @@ int main(void){
             }
         }
 
-        if (index!=-1)
+        if (index!=-1){
             args[index]=NULL;
             nargs = index;
+        }
 
         if(strcmp(cmd,"exit")==0){
             if(nargs>1 && strcmp(args[1],"0")==0) break;
