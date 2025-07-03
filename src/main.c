@@ -302,7 +302,6 @@ int main(void){
             }
             closedir(d);
         }
-        write(STDOUT_FILENO, "\r$ ", 3);
         char input[100];
         read_line(input,sizeof input, groot);
         int nargs = parser(input,args);
@@ -466,6 +465,7 @@ int main(void){
             dup2(builtin_saved,stream);
             close(builtin_saved);
         }
+        write(STDOUT_FILENO, "\r$ ", 3);
         enable_raw_mode();
     }
     disable_raw_mode();
