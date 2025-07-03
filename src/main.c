@@ -334,7 +334,7 @@ int main(void){
                 red_file = args[i+1];
                 break;
             }
-            
+
             if(strcmp(args[i],"&>")==0  || strcmp(args[i],"&>>")==0 ){
                 stream   = 1;
                 index    = i;
@@ -453,12 +453,13 @@ int main(void){
             }
         }
         else {
-            if(!runexec(args,stream,red_op,red_file))
+            if(!runexec(args,stream,red_op,red_file)){
                 printf("%s: command not found",cmd);
                 if (builtin_saved == -1)
                     write(STDOUT_FILENO, "\r\n", 2);
                 else
                     write(builtin_saved, "\r\n", 2);
+            }
         }
 
         if(builtin_saved!=-1){
