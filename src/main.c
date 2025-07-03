@@ -410,8 +410,7 @@ int main(void){
             }
             if (builtin_saved == -1)
                 write(STDOUT_FILENO, "\r\n", 2);
-            else
-                write(builtin_saved, "\r\n", 2);
+                
         }
 
         else if(strcmp(cmd,"type")==0){
