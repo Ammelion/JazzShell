@@ -460,8 +460,7 @@ int main(void){
                 printf("%s: command not found",cmd);
                 if (builtin_saved == -1)
                     write(STDOUT_FILENO, "\r\n", 2);
-                else
-                    write(builtin_saved, "\r\n", 2);
+                
             }
         }
 
