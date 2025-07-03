@@ -334,6 +334,7 @@ int main(void){
                 red_file = args[i+1];
                 break;
             }
+            
             if(strcmp(args[i],"&>")==0  || strcmp(args[i],"&>>")==0 ){
                 stream   = 1;
                 index    = i;
