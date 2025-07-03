@@ -306,7 +306,6 @@ int main(void){
         read_line(input,sizeof input, groot);
         int nargs = parser(input,args);
 
-        disable_raw_mode();
 
         if(nargs==0){
             enable_raw_mode();
