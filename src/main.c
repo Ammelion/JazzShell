@@ -278,7 +278,6 @@ ssize_t read_line(char *buf, size_t size, trienode *groot) {
     return pos;
 }
 
-
 int main(void){
     printf("$ ");
     setbuf(stdout,NULL);
