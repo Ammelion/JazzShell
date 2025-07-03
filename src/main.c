@@ -234,8 +234,7 @@ int runexec(char **arr, int stream, char *red_op, char *red_file){ //if i "someh
     }
 }
 
-ssize_t read_line(char *buf, size_t size, trienode *groot) {
-    write(STDOUT_FILENO, "\r$ ", 3);
+ssize_t read_line(char *buf, size_t size, trienode *groot){
     size_t pos=0;
     while(1){
         char c;
@@ -279,6 +278,11 @@ ssize_t read_line(char *buf, size_t size, trienode *groot) {
     return pos;
 }
 
+void print_prompt() {
+    if (isatty(STDOUT_FILENO))
+        write(STDOUT_FILENO, "\r$ ", 3);
+}
+
 int main(void){
     setbuf(stdout,NULL);
     char *args[100],len=0;
@@ -291,6 +295,7 @@ int main(void){
     }
     enable_raw_mode();
     while(1){
+        print_prompt();
         //i MUST initiate the stupid autocompletion part ;p
         trienode *groot=cptrie(sroot);
         DIR *d=opendir(".");
@@ -464,6 +469,7 @@ int main(void){
             dup2(builtin_saved,stream);
             close(builtin_saved);
         }
+        fflush(stdout);
         enable_raw_mode();
     }
     disable_raw_mode();
