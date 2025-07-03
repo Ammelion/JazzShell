@@ -246,6 +246,10 @@ ssize_t read_line(char *buf, size_t size, trienode *groot) {
         else if(c=='\t'){
             buf[pos] = '\0';
             trienode *n = find(groot, buf);
+            if (!n) {
+                write(STDOUT_FILENO, "\x07", 1);
+                continue;
+            }
             char suffix[100];
             if (n && trie_unique_suffix(n, suffix)) {
                 int add = strlen(suffix);
@@ -373,14 +377,19 @@ int main(void){
                 target=hcp;
             }
             if(chdir(target)!=0)
-                fprintf(stderr,"cd: %s: %s\n",target,strerror(errno));
+                fprintf(stderr,"cd: %s: %s",target,strerror(errno));
+                write(STDOUT_FILENO, "\r\n", 2);
         }
         else if(strcmp(cmd,"pwd")==0){
-            if(nargs>1) printf("pwd: Too many arguments\n");
+            if(nargs>1){
+            printf("pwd: Too many arguments");
+            write(STDOUT_FILENO, "\r\n", 2);
+            }
             else {
                 char cwd[300];
                 if(getcwd(cwd,sizeof(cwd)))
-                    printf("%s\n",cwd);
+                    printf("%s",cwd);
+                    write(STDOUT_FILENO, "\r\n", 2);
             }
         }
         else if(strcmp(cmd,"echo")==0){
@@ -388,14 +397,15 @@ int main(void){
                 printf("%s",args[i]);
                 if(i+1<nargs) printf(" ");
             }
-            printf("\n");
+            write(STDOUT_FILENO, "\r\n", 2);
         }
         else if(strcmp(cmd,"type")==0){
             char *t = nargs>1 ? args[1] : NULL;
             int fb=0;
             for(int i=0;i<5;i++){
                 if(t&&strcmp(t,builtins[i])==0){
-                    printf("%s is a shell builtin\n",t);
+                    printf("%s is a shell builtin",t);
+                    write(STDOUT_FILENO, "\r\n", 2);
                     fb=1;
                     break;
                 }
@@ -409,19 +419,22 @@ int main(void){
                     char fp[300];
                     strcpy(fp,d); strcat(fp,"/"); strcat(fp,t?t:"");
                     if(t&&access(fp,X_OK)==0){
-                        printf("%s is %s\n",t,fp);
+                        printf("%s is %s",t,fp);
+                        write(STDOUT_FILENO, "\r\n", 2);
                         fe=1;
                         break;
                     }
                     d=strtok(NULL,":");
                 }
                 free(cp2);
-                if(!fe) printf("%s: not found\n",t?t:"");
+                if(!fe) printf("%s: not found",t?t:"");
+                write(STDOUT_FILENO, "\r\n", 2);
             }
         }
         else {
             if(!runexec(args,stream,red_op,red_file))
-                printf("%s: command not found\n",cmd);
+                printf("%s: command not found",cmd);
+                write(STDOUT_FILENO, "\r\n", 2);
         }
 
         if(builtin_saved!=-1){
