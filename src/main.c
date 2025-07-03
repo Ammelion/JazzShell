@@ -235,6 +235,7 @@ int runexec(char **arr, int stream, char *red_op, char *red_file){ //if i "someh
 }
 
 ssize_t read_line(char *buf, size_t size, trienode *groot) {
+    write(STDOUT_FILENO, "\r$ ", 3);
     size_t pos=0;
     while(1){
         char c;
@@ -279,7 +280,6 @@ ssize_t read_line(char *buf, size_t size, trienode *groot) {
 }
 
 int main(void){
-    write(STDOUT_FILENO, "\r$ ", 3);
     setbuf(stdout,NULL);
     char *args[100],len=0;
     trienode *sroot =NULL;
@@ -465,7 +465,6 @@ int main(void){
             dup2(builtin_saved,stream);
             close(builtin_saved);
         }
-        write(STDOUT_FILENO, "\r$ ", 3);
         enable_raw_mode();
     }
     disable_raw_mode();
