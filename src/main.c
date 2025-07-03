@@ -387,9 +387,10 @@ int main(void){
             }
             else {
                 char cwd[300];
-                if(getcwd(cwd,sizeof(cwd)))
+                if(getcwd(cwd,sizeof(cwd))){
                     printf("%s",cwd);
                     write(STDOUT_FILENO, "\r\n", 2);
+                }
             }
         }
         else if(strcmp(cmd,"echo")==0){
