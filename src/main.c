@@ -382,10 +382,7 @@ int main(void){
             }
             if(chdir(target)!=0)
                 fprintf(stderr,"cd: %s: %s",target,strerror(errno));
-                if (builtin_saved == -1)
-                    write(STDOUT_FILENO, "\r\n", 2);
-                else
-                    write(builtin_saved, "\r\n", 2);
+                write(STDOUT_FILENO, "\n", 1);
         }  
         else if(strcmp(cmd,"pwd")==0){
             if(nargs>1){
