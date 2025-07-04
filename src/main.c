@@ -188,48 +188,76 @@ int parser(char *input, char *args[]){  //this is the funny tokenizaton part, ch
     return count;
 }
 
-int runexec(char **arr, int stream, char *red_op, char *red_file){ //if i "somehow" fail to find a builtin... maybe its in the executables list
-    int found=0;
+int runexec(char **arr, int stream, char *red_op, char *red_file){
+    int found = 0;
     char command[100];
-    strcpy(command,arr[0]);
-    char *path=getenv("PATH");
-    char pcc[300]; strcpy(pcc,path);
-    char *dir=strtok(pcc,":");
+    strcpy(command, arr[0]);
+    char *path = getenv("PATH");
+    char pcc[300];  strcpy(pcc, path);
+    char *dir = strtok(pcc, ":");
     char cp[300];
 
-    while(dir){
-        strcpy(cp,dir);
-        strcat(cp,"/");
-        strcat(cp,command);
-        if(access(cp,X_OK)==0){
-            strcpy(pcc,cp);
-            found=1;
+    while (dir) {
+        strcpy(cp, dir);
+        strcat(cp, "/");
+        strcat(cp, command);
+        if (access(cp, X_OK) == 0) {
+            strcpy(pcc, cp);
+            found = 1;
             break;
         }
-        dir=strtok(NULL,":");
+        dir = strtok(NULL, ":");
     }
-    if(!found) return 0;
+    if (!found) return 0;
 
-    int pid=fork();
-    if(pid==0){
-        if(red_file){
-            int flags = O_WRONLY|O_CREAT
+    pid_t pid = fork();
+    if (pid == 0) {
+        // --- child ---
+        if (red_file) {
+            int flags = O_WRONLY | O_CREAT
                       | (strstr(red_op, ">>") ? O_APPEND : O_TRUNC);
-            int fd=open(red_file, flags, 0666);
-            if(fd<0){
+            int fd = open(red_file, flags, 0666);
+            if (fd < 0) {
                 perror(red_file);
                 exit(1);
             }
-            dup2(fd,stream);
-            if(strcmp(red_op,"&>")==0 || strcmp(red_op,"&>>")==0)
-                dup2(fd,2);
+            dup2(fd, stream);
+            if (strcmp(red_op, "&>") == 0 || strcmp(red_op, "&>>") == 0)
+                dup2(fd, 2);
             close(fd);
         }
-        execv(pcc,arr);
+        execv(pcc, arr);
         perror("execv");
         exit(1);
     } else {
+        // --- parent ---
         wait(NULL);
+
+        // Only do our “fix‑up” if:
+        //  - stdout was NOT redirected (stream != 1)
+        //  - this was exactly “cat filename” (no extra args)
+        if (stream != 1
+            && strcmp(arr[0], "cat") == 0
+            && arr[1] != NULL
+            && arr[2] == NULL)
+        {
+            // open the file and check its last byte
+            int f = open(arr[1], O_RDONLY);
+            if (f >= 0) {
+                off_t last = lseek(f, -1, SEEK_END);
+                if (last >= 0) {
+                    char ch;
+                    if (read(f, &ch, 1) == 1 && ch != '\n') {
+                        write(STDOUT_FILENO, "\r\n", 2);
+                    }
+                }
+                close(f);
+            } else {
+                // if we couldn’t open it, still print a newline
+                write(STDOUT_FILENO, "\r\n", 2);
+            }
+        }
+
         return 1;
     }
 }
@@ -463,9 +491,7 @@ int main(void){
         }
         fflush(stdout);
         enable_raw_mode();
-        if (strncmp(args[0],"cat",3)==0) {
-            write(STDOUT_FILENO, "\r\n", 2);
-        }
+
     }
     disable_raw_mode();
     return 0;
