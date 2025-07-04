@@ -381,13 +381,14 @@ int main(void){
                 target=hcp;
             }
             if(chdir(target)!=0)
-                fprintf(stderr,"cd: %s: %s",target,strerror(errno));
+                fprintf(stderr,"cd: %s: %s\n",target,strerror(errno));
+            else{
                 write(STDOUT_FILENO, "\n", 1);
+            }
         }  
         else if(strcmp(cmd,"pwd")==0){
             if(nargs>1){
             printf("pwd: Too many arguments");
-            write(STDOUT_FILENO, "\r\n", 2);
             }
             else {
                 char cwd[300];
