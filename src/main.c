@@ -298,7 +298,7 @@ ssize_t read_line(char *buf, size_t size, trienode *groot) {
 
                     write(STDOUT_FILENO, "\r\n", 2);
                     for (int i = 0; i < mcount; i++) {
-                        write(STDOUT_FILENO, buf + start, pos - start);
+                         write(STDOUT_FILENO, buf + start, pos - start);
                         write(STDOUT_FILENO, matches[i], strlen(matches[i]));
                         if (i + 1 < mcount) write(STDOUT_FILENO, "  ", 2);
                     }
