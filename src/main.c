@@ -382,9 +382,6 @@ int main(void){
             }
             if(chdir(target)!=0)
                 fprintf(stderr,"cd: %s: %s\n",target,strerror(errno));
-            else{
-                write(STDOUT_FILENO, "\n", 1);
-            }
         }  
         else if(strcmp(cmd,"pwd")==0){
             if(nargs>1){
