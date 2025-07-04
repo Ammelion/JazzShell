@@ -234,24 +234,37 @@ int runexec(char **arr, int stream, char *red_op, char *red_file){ //if i "someh
     }
 }
 
-ssize_t read_line(char *buf, size_t size, trienode *groot){
-    size_t pos=0;
-    while(1){
+ssize_t read_line(char *buf, size_t size, trienode *groot) {
+    size_t pos = 0;
+
+    while (1) {
         char c;
-        if (read(STDIN_FILENO,&c,1)<=0) return -1;
-        if (c=='\n' || c == '\r') {
+        if (read(STDIN_FILENO, &c, 1) <= 0) return -1;
+
+        if (c == '\n' || c == '\r') {
             write(STDOUT_FILENO, "\r\n", 2);
             break;
         }
-        else if(c=='\t'){
+        else if (c == '\t') {
+            // 1. Null-terminate so find() works
             buf[pos] = '\0';
-            trienode *n = find(groot, buf);
+
+            // 2. Locate the start of the current token
+            size_t token_start = pos;
+            while (token_start > 0 && !isspace((unsigned char)buf[token_start - 1])) {
+                token_start--;
+            }
+
+            // 3. Lookup only the current token in the trie
+            trienode *n = find(groot, buf + token_start);
             if (!n) {
-                write(STDOUT_FILENO, "\x07", 1);
+                write(STDOUT_FILENO, "\x07", 1);  // bell
                 continue;
             }
+
+            // 4. If exactly one completion, append its unique suffix + space
             char suffix[100];
-            if (n && trie_unique_suffix(n, suffix)) {
+            if (trie_unique_suffix(n, suffix)) {
                 int add = strlen(suffix);
                 if (pos + add + 1 < size) {
                     memcpy(buf + pos, suffix, add);
@@ -262,21 +275,24 @@ ssize_t read_line(char *buf, size_t size, trienode *groot){
                 }
             }
         }
-        else if(c==127 || c=='\b'){
-            if (pos > 0){
+        else if (c == 127 || c == '\b') {
+            if (pos > 0) {
                 pos--;
                 write(STDOUT_FILENO, "\b \b", 3);
             }
-        } else if (isprint((unsigned char)c)){
-            if(pos + 1 < size){
+        }
+        else if (isprint((unsigned char)c)) {
+            if (pos + 1 < size) {
                 buf[pos++] = c;
                 write(STDOUT_FILENO, &c, 1);
             }
         }
     }
+
     buf[pos] = '\0';
     return pos;
 }
+
 
 void print_prompt() {
     if (isatty(STDOUT_FILENO))
