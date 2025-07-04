@@ -412,10 +412,7 @@ int main(void){
             for(int i=0;i<5;i++){
                 if(t&&strcmp(t,builtins[i])==0){
                     printf("%s is a shell builtin",t);
-                    if (builtin_saved == -1)
-                        write(STDOUT_FILENO, "\r\n", 2);
-                    else
-                        write(builtin_saved, "\r\n", 2);
+                    write(STDOUT_FILENO, "\n", 1);
                     fb=1;
                     break;
                 }
@@ -430,30 +427,23 @@ int main(void){
                     strcpy(fp,d); strcat(fp,"/"); strcat(fp,t?t:"");
                     if(t&&access(fp,X_OK)==0){
                         printf("%s is %s",t,fp);
-                        if (builtin_saved == -1)
-                            write(STDOUT_FILENO, "\r\n", 2);
-                        else
-                            write(builtin_saved, "\r\n", 2);
+                        write(STDOUT_FILENO, "\n", 1);
                         fe=1;
                         break;
                     }
                     d=strtok(NULL,":");
                 }
                 free(cp2);
-                if(!fe) printf("%s: not found",t?t:"");
-                if (builtin_saved == -1)
-                    write(STDOUT_FILENO, "\r\n", 2);
-                else
-                    write(builtin_saved, "\r\n", 2);
+                if(!fe){
+                    printf("%s: not found",t?t:"");
+                    write(STDOUT_FILENO, "\n", 1);
+                }
             }
         }
         else {
             if(!runexec(args,stream,red_op,red_file)){
                 printf("%s: command not found",cmd);
-                if (builtin_saved == -1)
-                    write(STDOUT_FILENO, "\n", 2);
-                else
-                    write(builtin_saved, "\n", 2);
+                write(STDOUT_FILENO, "\n", 1);
             }
         }
 
