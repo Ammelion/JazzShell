@@ -463,6 +463,9 @@ int main(void){
         }
         fflush(stdout);
         enable_raw_mode();
+        if (strncmp(args[0],"cat",3)==0) {
+            write(STDOUT_FILENO, "\r\n", 2);
+        }
     }
     disable_raw_mode();
     return 0;
