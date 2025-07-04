@@ -280,7 +280,7 @@ ssize_t read_line(char *buf, size_t size, trienode *groot){
 
 void print_prompt() {
     if (isatty(STDOUT_FILENO))
-        write(STDOUT_FILENO, "\r$ ", 3);
+        write(STDOUT_FILENO, "$ ", 3);
 }
 
 int main(void){
@@ -408,10 +408,7 @@ int main(void){
                 printf("%s",args[i]);
                 if(i+1<nargs) printf(" ");
             }
-            if (builtin_saved == -1)
-                write(STDOUT_FILENO, "\r\n", 2);
-            else
-                write(builtin_saved, "\r\n", 2);
+            write(STDOUT_FILENO, "\n", 1);
         }
 
         else if(strcmp(cmd,"type")==0){
