@@ -443,8 +443,6 @@ int main(void){
                 if(!fe) printf("%s: not found",t?t:"");
                 if (builtin_saved == -1)
                     write(STDOUT_FILENO, "\r\n", 2);
-                else
-                    write(builtin_saved, "\r\n", 2);
             }
         }
         else {
