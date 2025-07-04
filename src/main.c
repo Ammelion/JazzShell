@@ -11,7 +11,9 @@
 #include <termios.h>
 #include <limits.h>
 
-typedef struct trienode //enables awesome lookup time
+
+void print_prompt(void);
+typedef struct trienode
 {
     struct trienode *children[256];
     bool terminal;
@@ -189,6 +191,21 @@ int parser(char *input, char *args[]){  //this is the funny tokenizaton part, ch
     return count;
 }
 
+char *matches[256];
+int mcount = 0;
+void collect(trienode *node, char *b, int depth) {
+    if (node->terminal) {
+        b[depth] = '\0';
+        matches[mcount++] = strdup(b);
+    }
+    for (int i = 0; i < 256 && mcount < 256; i++) {
+        if (node->children[i]) {
+            b[depth] = (char)i;
+            collect(node->children[i], b, depth + 1);
+        }
+    }
+}
+
 int runexec(char **arr, int stream, char *red_op, char *red_file){ //if i "somehow" fail to find a builtin... maybe its in the executables list
     int found=0;
     char command[100];
@@ -237,6 +254,7 @@ int runexec(char **arr, int stream, char *red_op, char *red_file){ //if i "someh
 
 ssize_t read_line(char *buf, size_t size, trienode *groot) {
     size_t pos = 0;
+    static int tab_count = 0;
 
     while (1) {
         char c;
@@ -247,45 +265,66 @@ ssize_t read_line(char *buf, size_t size, trienode *groot) {
             break;
         }
         else if (c == '\t') {
-            // 1. Null-terminate so find() works
             buf[pos] = '\0';
-
-            // 2. Locate the start of the current token
-            size_t token_start = pos;
-            while (token_start > 0 && !isspace((unsigned char)buf[token_start - 1])) {
-                token_start--;
+            size_t start = pos;
+            while (start > 0 && !isspace((unsigned char)buf[start - 1])) {
+                start--;
             }
-
-            // 3. Lookup only the current token in the trie
-            trienode *n = find(groot, buf + token_start);
+            trienode *n = find(groot, buf + start);
             if (!n) {
-                write(STDOUT_FILENO, "\x07", 1);  // bell
+                write(STDOUT_FILENO, "\a", 1);
+                tab_count = 0;
                 continue;
             }
 
-            // 4. If exactly one completion, append its unique suffix + space
             char suffix[100];
             if (trie_unique_suffix(n, suffix)) {
-                int add = strlen(suffix);
-                if (pos + add + 1 < size) {
-                    memcpy(buf + pos, suffix, add);
-                    pos += add;
+                int len = strlen(suffix);
+                if (pos + len + 1 < size) {
+                    memcpy(buf + pos, suffix, len);
+                    pos += len;
                     buf[pos++] = ' ';
-                    write(STDOUT_FILENO, suffix, add);
+                    write(STDOUT_FILENO, suffix, len);
                     write(STDOUT_FILENO, " ", 1);
+                }
+                tab_count = 0;
+            }
+            else {
+                tab_count++;
+                if (tab_count == 1) {
+                    write(STDOUT_FILENO, "\a", 1);
+                } else {
+                    collect(n, suffix, 0);
+
+                    write(STDOUT_FILENO, "\r\n", 2);
+                    for (int i = 0; i < mcount; i++) {
+                        write(STDOUT_FILENO, buf + start, start);
+                        write(STDOUT_FILENO, matches[i], strlen(matches[i]));
+                        if (i + 1 < mcount) write(STDOUT_FILENO, "  ", 2);
+                        free(matches[i]);
+                    }
+                    write(STDOUT_FILENO, "\r\n", 2);
+
+                    print_prompt();
+                    write(STDOUT_FILENO, buf, pos);
+
+                    tab_count = 0;
                 }
             }
         }
-        else if (c == 127 || c == '\b') {
-            if (pos > 0) {
-                pos--;
-                write(STDOUT_FILENO, "\b \b", 3);
+        else {
+            tab_count = 0;
+            if (c == 127 || c == '\b') {
+                if (pos > 0) {
+                    pos--;
+                    write(STDOUT_FILENO, "\b \b", 3);
+                }
             }
-        }
-        else if (isprint((unsigned char)c)) {
-            if (pos + 1 < size) {
-                buf[pos++] = c;
-                write(STDOUT_FILENO, &c, 1);
+            else if (isprint((unsigned char)c)) {
+                if (pos + 1 < size) {
+                    buf[pos++] = c;
+                    write(STDOUT_FILENO, &c, 1);
+                }
             }
         }
     }
@@ -335,7 +374,7 @@ int main(void){
                     struct dirent *pent;
                     while((pent = readdir(pd))){
                         if(pent->d_name[0]=='.') continue;
-                        char full[PATH_MAX];
+                        char full[300];
                         snprintf(full, sizeof(full), "%s/%s", dir, pent->d_name);
                         if(access(full, X_OK) == 0){
                             trieinsert(&groot, pent->d_name);
