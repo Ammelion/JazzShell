@@ -443,15 +443,17 @@ int main(void){
                 if(!fe) printf("%s: not found",t?t:"");
                 if (builtin_saved == -1)
                     write(STDOUT_FILENO, "\r\n", 2);
+                else
+                    write(builtin_saved, "\r\n", 2);
             }
         }
         else {
             if(!runexec(args,stream,red_op,red_file)){
                 printf("%s: command not found",cmd);
                 if (builtin_saved == -1)
-                    write(STDOUT_FILENO, "\r\n", 2);
+                    write(STDOUT_FILENO, "\n", 2);
                 else
-                    write(builtin_saved, "\r\n", 2);
+                    write(builtin_saved, "\n", 2);
             }
         }
 
