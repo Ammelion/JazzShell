@@ -380,12 +380,13 @@ int main(void){
                 strcat(hcp,target+1);
                 target=hcp;
             }
-            if(chdir(target)!=0)
-                fprintf(stderr,"cd: %s: %s",target,strerror(errno));
+            if (chdir(target) != 0) {
+                fprintf(stderr, "cd: %s: %s", target, strerror(errno));
+                write(STDERR_FILENO, "\r\n", 2);
+            } else {
                 if (builtin_saved == -1)
                     write(STDOUT_FILENO, "\r\n", 2);
-                else
-                    write(builtin_saved, "\r\n", 2);
+            }
         }  
         else if(strcmp(cmd,"pwd")==0){
             if(nargs>1){
@@ -398,8 +399,6 @@ int main(void){
                     printf("%s",cwd);
                     if (builtin_saved == -1)
                         write(STDOUT_FILENO, "\r\n", 2);
-                    else
-                        write(builtin_saved, "\r\n", 2);
                 }
             }
         }
@@ -410,8 +409,6 @@ int main(void){
             }
             if (builtin_saved == -1)
                 write(STDOUT_FILENO, "\r\n", 2);
-            else
-                write(builtin_saved, "\r\n", 2);
         }
 
         else if(strcmp(cmd,"type")==0){
@@ -422,8 +419,6 @@ int main(void){
                     printf("%s is a shell builtin",t);
                     if (builtin_saved == -1)
                         write(STDOUT_FILENO, "\r\n", 2);
-                    else
-                        write(builtin_saved, "\r\n", 2);
                     fb=1;
                     break;
                 }
@@ -440,8 +435,6 @@ int main(void){
                         printf("%s is %s",t,fp);
                         if (builtin_saved == -1)
                             write(STDOUT_FILENO, "\r\n", 2);
-                        else
-                            write(builtin_saved, "\r\n", 2);
                         fe=1;
                         break;
                     }
@@ -451,8 +444,6 @@ int main(void){
                 if(!fe) printf("%s: not found",t?t:"");
                 if (builtin_saved == -1)
                     write(STDOUT_FILENO, "\r\n", 2);
-                else
-                    write(builtin_saved, "\r\n", 2);
             }
         }
         else {
@@ -460,8 +451,6 @@ int main(void){
                 printf("%s: command not found",cmd);
                 if (builtin_saved == -1)
                     write(STDOUT_FILENO, "\r\n", 2);
-                else
-                    write(builtin_saved, "\r\n", 2);
             }
         }
 
