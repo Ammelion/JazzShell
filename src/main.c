@@ -9,6 +9,7 @@
 #include <stdbool.h>
 #include <dirent.h>
 #include <termios.h>
+#include <limits.h>
 
 typedef struct trienode //enables awesome lookup time
 {
@@ -323,6 +324,30 @@ int main(void){
             }
             closedir(d);
         }
+
+        char *path_env = getenv("PATH");
+        if(path_env){
+            char *path_dup = strdup(path_env);
+            char *dir = strtok(path_dup, ":");
+            while(dir){
+                DIR *pd = opendir(dir);
+                if(pd){
+                    struct dirent *pent;
+                    while((pent = readdir(pd))){
+                        if(pent->d_name[0]=='.') continue;
+                        char full[PATH_MAX];
+                        snprintf(full, sizeof(full), "%s/%s", dir, pent->d_name);
+                        if(access(full, X_OK) == 0){
+                            trieinsert(&groot, pent->d_name);
+                        }
+                    }
+                    closedir(pd);
+                }
+                dir = strtok(NULL, ":");
+            }
+            free(path_dup);
+        }
+
         char input[100];
         read_line(input,sizeof input, groot);
         int nargs = parser(input,args);
