@@ -59,7 +59,7 @@ trienode *cptrie(trienode *root){
     trienode *newnode=createnode();
     newnode->terminal=root->terminal;
 
-    for(int i=0; i<256; i++){
+    for(int i=0;i<256;i++){
         if(root->children[i]){
             newnode->children[i]=cptrie(root->children[i]);
         }
@@ -76,16 +76,16 @@ trienode *find(trienode *root,const char *prefix){
     return node;
 }
 
-static int dfs(trienode *node, char *buf, int depth) {
+static int dfs(trienode *node, char *buf, int depth){
     int found = 0;
-    if (node->terminal) {
-        buf[depth] = '\0';
-        found = 1;
+    if (node->terminal){
+        buf[depth]='\0';
+        found=1;
     }
-    for (int c = 0; c < 256 && found < 2; c++) {
-        if (node->children[c]) {
+    for(int c=0; c<256 && found<2; c++){
+        if (node->children[c]){
             buf[depth] = (char)c;
-            int n = dfs(node->children[c], buf, depth + 1);
+            int n=dfs(node->children[c], buf, depth + 1);
             found += n;
             if (found > 1) break;
         }
@@ -93,7 +93,7 @@ static int dfs(trienode *node, char *buf, int depth) {
     return found;
 }
 
-bool trie_unique_suffix(trienode *node, char *outbuf) {
+bool usufix(trienode *node, char *outbuf) {
     int count = dfs(node, outbuf, 0);
     return (count == 1);
 }
@@ -252,6 +252,32 @@ int runexec(char **arr, int stream, char *red_op, char *red_file){ //if i "someh
     }
 }
 
+
+void print_prompt() {
+    if (isatty(STDOUT_FILENO))
+        write(STDOUT_FILENO, "$ ", 3);
+}
+// --- new helper: collect full completions (prefix + suffix) into matches[] ---
+static void collect_full(trienode *node, const char *prefix, char *b, int depth) {
+    if (node->terminal) {
+        b[depth] = '\0';
+        size_t plen = strlen(prefix);
+        size_t total = plen + depth;
+        char *full = malloc(total + 1);
+        memcpy(full, prefix, plen);
+        memcpy(full + plen, b, depth);
+        full[total] = '\0';
+        matches[mcount++] = full;
+    }
+    for (int c = 0; c < 256 && mcount < 256; c++) {
+        if (node->children[c]) {
+            b[depth] = (char)c;
+            collect_full(node->children[c], prefix, b, depth + 1);
+        }
+    }
+}
+
+// --- updated read_line() ---
 ssize_t read_line(char *buf, size_t size, trienode *groot) {
     size_t pos = 0;
     static int tab_count = 0;
@@ -260,16 +286,20 @@ ssize_t read_line(char *buf, size_t size, trienode *groot) {
         char c;
         if (read(STDIN_FILENO, &c, 1) <= 0) return -1;
 
+        // ENTER: finish input
         if (c == '\n' || c == '\r') {
             write(STDOUT_FILENO, "\r\n", 2);
             break;
         }
+        // TAB: completion
         else if (c == '\t') {
             buf[pos] = '\0';
+
+            // find token start
             size_t start = pos;
-            while (start > 0 && !isspace((unsigned char)buf[start - 1])) {
+            while (start > 0 && !isspace((unsigned char)buf[start-1]))
                 start--;
-            }
+
             trienode *n = find(groot, buf + start);
             if (!n) {
                 write(STDOUT_FILENO, "\a", 1);
@@ -277,55 +307,89 @@ ssize_t read_line(char *buf, size_t size, trienode *groot) {
                 continue;
             }
 
-            char suffix[100];
-            if (trie_unique_suffix(n, suffix)) {
-                int len = strlen(suffix);
-                if (pos + len + 1 < size) {
-                    memcpy(buf + pos, suffix, len);
-                    pos += len;
-                    buf[pos++] = ' ';
-                    write(STDOUT_FILENO, suffix, len);
-                    write(STDOUT_FILENO, " ", 1);
+            // — FIRST TAB: unique/LCP‑append —
+            if (tab_count == 0) {
+                // clear old matches
+                for (int i = 0; i < mcount; i++) free(matches[i]);
+                mcount = 0;
+
+                // capture the already‑typed prefix
+                char prefix[100];
+                size_t plen = pos - start;
+                memcpy(prefix, buf + start, plen);
+                prefix[plen] = '\0';
+
+                // collect full completions
+                char suffix[100];
+                collect_full(n, prefix, suffix, 0);
+
+                if (mcount == 1) {
+                    // unique: append rest of matches[0] + space
+                    char *s = matches[0];
+                    int already = plen;
+                    int extra   = strlen(s) - already;
+                    if (pos + extra + 1 < size) {
+                        memcpy(buf + pos, s + already, extra);
+                        pos += extra;
+                        buf[pos++] = ' ';
+                        write(STDOUT_FILENO, s + already, extra);
+                        write(STDOUT_FILENO, " ", 1);
+                    }
                 }
+                else if (mcount > 1) {
+                    // LCP of full completions
+                    int common = strlen(matches[0]);
+                    for (int i = 1; i < mcount; i++)
+                        common = common < (int)strspn(matches[i], matches[0])
+                               ? common
+                               : (int)strspn(matches[i], matches[0]);
+
+                    int already = plen;
+                    int extra   = common - already;
+                    if (extra > 0 && pos + extra < size) {
+                        memcpy(buf + pos, matches[0] + already, extra);
+                        pos += extra;
+                        write(STDOUT_FILENO, matches[0] + already, extra);
+                    } else {
+                        write(STDOUT_FILENO, "\a", 1);
+                    }
+                }
+                else {
+                    write(STDOUT_FILENO, "\a", 1);
+                }
+
+                tab_count = 1;
+            }
+            // — SECOND TAB: list all completions —
+            else {
+                write(STDOUT_FILENO, "\r\n", 2);
+                for (int i = 0; i < mcount; i++) {
+                    write(STDOUT_FILENO, matches[i], strlen(matches[i]));
+                    if (i + 1 < mcount)
+                        write(STDOUT_FILENO, "  ", 2);
+                }
+                write(STDOUT_FILENO, "\r\n", 2);
+                // re‑draw prompt + buffer
+                print_prompt();
+                write(STDOUT_FILENO, buf, pos);
+                fflush(stdout);
+
                 tab_count = 0;
             }
-            else {
-                tab_count++;
-                if (tab_count == 1) {
-                    write(STDOUT_FILENO, "\a", 1);
-                } else {
-                    collect(n, suffix, 0);
-
-                    write(STDOUT_FILENO, "\r\n", 2);
-                    for (int i = 0; i < mcount; i++) {
-                         write(STDOUT_FILENO, buf + start, pos - start);
-                        write(STDOUT_FILENO, matches[i], strlen(matches[i]));
-                        if (i + 1 < mcount) write(STDOUT_FILENO, "  ", 2);
-                    }
-
-                    write(STDOUT_FILENO, "\r\n", 2);
-
-                    print_prompt();
-                    write(STDOUT_FILENO, buf, pos);
-
-                    tab_count = 0;
-                }
-            }
         }
+        // backspace or printable char
         else {
-            tab_count = 0;
             if (c == 127 || c == '\b') {
                 if (pos > 0) {
                     pos--;
                     write(STDOUT_FILENO, "\b \b", 3);
                 }
             }
-            else if (isprint((unsigned char)c)) {
-                if (pos + 1 < size) {
-                    buf[pos++] = c;
-                    write(STDOUT_FILENO, &c, 1);
-                }
+            else if (isprint((unsigned char)c) && pos + 1 < size) {
+                buf[pos++] = c;
+                write(STDOUT_FILENO, &c, 1);
             }
+            tab_count = 0;
         }
     }
 
@@ -333,11 +397,6 @@ ssize_t read_line(char *buf, size_t size, trienode *groot) {
     return pos;
 }
 
-
-void print_prompt() {
-    if (isatty(STDOUT_FILENO))
-        write(STDOUT_FILENO, "$ ", 3);
-}
 
 int main(void){
     setbuf(stdout,NULL);
