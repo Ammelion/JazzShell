@@ -604,7 +604,7 @@ int main(void){
                 printf("%s: command not found",cmd);
                 write(STDOUT_FILENO, "\n", 1);
             }
-        } //bypass
+        }
         if(builtin_saved!=-1){
             dup2(builtin_saved,stream);
             close(builtin_saved);
