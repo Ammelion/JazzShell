@@ -11,8 +11,6 @@
 #include <termios.h>
 #include <limits.h>
 
-
-void print_prompt(void);
 typedef struct trienode
 {
     struct trienode *children[256];
@@ -206,6 +204,231 @@ void collect(trienode *node, char *b, int depth) {
     }
 }
 
+void print_prompt() {
+    if (isatty(STDOUT_FILENO))
+        write(STDOUT_FILENO, "$ ", 2);
+}
+
+static void collect_full(trienode *node, const char *prefix, char *b, int depth) {
+    if (node->terminal) {
+        b[depth] = '\0';
+        size_t plen = strlen(prefix);
+        size_t total = plen + depth;
+        char *full = malloc(total + 1);
+        memcpy(full, prefix, plen);
+        memcpy(full + plen, b, depth);
+        full[total] = '\0';
+        matches[mcount++] = full;
+    }
+    for (int c = 0; c < 256 && mcount < 256; c++) {
+        if (node->children[c]) {
+            b[depth] = (char)c;
+            collect_full(node->children[c], prefix, b, depth + 1);
+        }
+    }
+}
+
+ssize_t read_line(char *buf, size_t size, trienode *groot) {
+    size_t pos = 0;
+    static int tab_count = 0;
+
+    while (1) {
+        char c;
+        if (read(STDIN_FILENO, &c, 1) <= 0) return -1;
+
+        if (c == '\n' || c == '\r') {
+            write(STDOUT_FILENO, "\r\n", 2);
+            break;
+        }
+        else if (c == '\t') {
+            buf[pos] = '\0';
+            size_t start = pos;
+            while (start > 0 && !isspace((unsigned char)buf[start-1]))
+                start--;
+
+            trienode *n = find(groot, buf + start);
+            if (!n) {
+                write(STDOUT_FILENO, "\a", 1);
+                tab_count = 0;
+                continue;
+            }
+
+            if (tab_count == 0) {
+                for (int i = 0; i < mcount; i++) free(matches[i]);
+                mcount = 0;
+
+                char prefix[100];
+                size_t plen = pos - start;
+                memcpy(prefix, buf + start, plen);
+                prefix[plen] = '\0';
+
+                char suffix[100];
+                collect_full(n, prefix, suffix, 0);
+
+                if (mcount == 1) {
+                    char *s = matches[0];
+                    int already = plen;
+                    int extra   = strlen(s) - already;
+                    if (pos + extra + 1 < size) {
+                        memcpy(buf + pos, s + already, extra);
+                        pos += extra;
+                        buf[pos++] = ' ';
+                        write(STDOUT_FILENO, s + already, extra);
+                        write(STDOUT_FILENO, " ", 1);
+                    }
+                }
+                else if (mcount > 1) {
+                    // LCP of full completions
+                    int common = strlen(matches[0]);
+                    for (int i = 1; i < mcount; i++)
+                        common = common < (int)strspn(matches[i], matches[0])
+                               ? common
+                               : (int)strspn(matches[i], matches[0]);
+
+                    int already = plen;
+                    int extra   = common - already;
+                    if (extra > 0 && pos + extra < size) {
+                        memcpy(buf + pos, matches[0] + already, extra);
+                        pos += extra;
+                        write(STDOUT_FILENO, matches[0] + already, extra);
+                    } else {
+                        write(STDOUT_FILENO, "\a", 1);
+                    }
+                }
+                else {
+                    write(STDOUT_FILENO, "\a", 1);
+                }
+
+                tab_count = 1;
+            }
+            else {
+                write(STDOUT_FILENO, "\r\n", 2);
+                for (int i = 0; i < mcount; i++) {
+                    write(STDOUT_FILENO, matches[i], strlen(matches[i]));
+                    if (i + 1 < mcount)
+                        write(STDOUT_FILENO, "  ", 2);
+                }
+                write(STDOUT_FILENO, "\r\n", 2);
+                // re-draw prompt + buffer
+                print_prompt();
+                write(STDOUT_FILENO, buf, pos);
+                fflush(stdout);
+
+                tab_count = 0;
+            }
+        }
+        else {
+            if (c == 127 || c == '\b') {
+                if (pos > 0) {
+                    pos--;
+                    write(STDOUT_FILENO, "\b \b", 3);
+                }
+            }
+            else if (isprint((unsigned char)c) && pos + 1 < size) {
+                buf[pos++] = c;
+                write(STDOUT_FILENO, &c, 1);
+            }
+            tab_count = 0;
+        }
+    }
+
+    buf[pos] = '\0';
+    return pos;
+}
+
+int exit_cmd(char **args, int nargs){
+    if (nargs>1){
+        char *end;
+        errno=0;
+        long val=strtol(args[1], &end, 10);
+        if (errno==0 && *end=='\0'){
+            return (int)val;
+        }
+        else{
+            fprintf(stderr,"exit: invalid numeric argument: %s\n",args[1]);
+            return 1;
+        }
+    }
+    return 0;
+}
+
+void cd(char **args,int nargs){
+    char *target = nargs>1 ? args[1] : getenv("HOME");
+    if(!target) target="/";
+
+    if(target[0]=='~'){
+        char hcp[300];
+        strcpy(hcp,getenv("HOME"));
+        strcat(hcp,target+1);
+        target=hcp;
+        }
+    if(chdir(target)!=0)
+    fprintf(stderr,"cd: %s: %s\n",target,strerror(errno));
+    return;
+}
+    
+void pwd(int nargs,int builtin_saved){
+    if(nargs>1){
+    printf("pwd: Too many arguments");
+    }
+    else {
+        char cwd[300];
+        if(getcwd(cwd,sizeof(cwd))){
+            printf("%s",cwd);
+            if (builtin_saved == -1)
+                write(STDOUT_FILENO, "\r\n", 2);
+            else
+                write(builtin_saved, "\r\n", 2);
+        }
+    }
+    return;
+}
+
+void echo(char **args, int nargs){
+    for(int i=1;i<nargs;i++){
+        printf("%s",args[i]);
+        if(i+1<nargs) printf(" ");
+    }
+    write(STDOUT_FILENO, "\n", 1);
+    return;
+}
+
+void type(char **args, int nargs, char **builtins){
+    char *t = nargs>1 ? args[1] : NULL;
+    int fb=0;
+    for(int i=0;i<5;i++){
+        if(t&&strcmp(t,builtins[i])==0){
+            printf("%s is a shell builtin",t);
+            write(STDOUT_FILENO, "\n", 1);
+            fb=1;
+            break;
+        }
+    }
+    if(!fb){
+        char *p2 = getenv("PATH");
+        char *cp2 = strdup(p2);
+        char *d  = strtok(cp2,":");
+        int fe=0;
+        while(d){
+            char fp[300];
+            strcpy(fp,d); strcat(fp,"/"); strcat(fp,t?t:"");
+            if(t&&access(fp,X_OK)==0){
+                printf("%s is %s",t,fp);
+                write(STDOUT_FILENO, "\n", 1);
+                fe=1;
+                break;
+            }
+            d=strtok(NULL,":");
+        }
+        free(cp2);
+        if(!fe){
+            printf("%s: not found",t?t:"");
+            write(STDOUT_FILENO, "\n", 1);
+        }
+    }
+}
+
+
 int runexec(char **arr, int stream, char *red_op, char *red_file){ //if i "somehow" fail to find a builtin... maybe its in the executables list
     int found=0;
     char command[100];
@@ -252,150 +475,6 @@ int runexec(char **arr, int stream, char *red_op, char *red_file){ //if i "someh
     }
 }
 
-
-void print_prompt() {
-    if (isatty(STDOUT_FILENO))
-        write(STDOUT_FILENO, "$ ", 3);
-}
-// --- new helper: collect full completions (prefix + suffix) into matches[] ---
-static void collect_full(trienode *node, const char *prefix, char *b, int depth) {
-    if (node->terminal) {
-        b[depth] = '\0';
-        size_t plen = strlen(prefix);
-        size_t total = plen + depth;
-        char *full = malloc(total + 1);
-        memcpy(full, prefix, plen);
-        memcpy(full + plen, b, depth);
-        full[total] = '\0';
-        matches[mcount++] = full;
-    }
-    for (int c = 0; c < 256 && mcount < 256; c++) {
-        if (node->children[c]) {
-            b[depth] = (char)c;
-            collect_full(node->children[c], prefix, b, depth + 1);
-        }
-    }
-}
-
-// --- updated read_line() ---
-ssize_t read_line(char *buf, size_t size, trienode *groot) {
-    size_t pos = 0;
-    static int tab_count = 0;
-
-    while (1) {
-        char c;
-        if (read(STDIN_FILENO, &c, 1) <= 0) return -1;
-
-        // ENTER: finish input
-        if (c == '\n' || c == '\r') {
-            write(STDOUT_FILENO, "\r\n", 2);
-            break;
-        }
-        // TAB: completion
-        else if (c == '\t') {
-            buf[pos] = '\0';
-
-            // find token start
-            size_t start = pos;
-            while (start > 0 && !isspace((unsigned char)buf[start-1]))
-                start--;
-
-            trienode *n = find(groot, buf + start);
-            if (!n) {
-                write(STDOUT_FILENO, "\a", 1);
-                tab_count = 0;
-                continue;
-            }
-
-            // — FIRST TAB: unique/LCP‑append —
-            if (tab_count == 0) {
-                // clear old matches
-                for (int i = 0; i < mcount; i++) free(matches[i]);
-                mcount = 0;
-
-                // capture the already‑typed prefix
-                char prefix[100];
-                size_t plen = pos - start;
-                memcpy(prefix, buf + start, plen);
-                prefix[plen] = '\0';
-
-                // collect full completions
-                char suffix[100];
-                collect_full(n, prefix, suffix, 0);
-
-                if (mcount == 1) {
-                    // unique: append rest of matches[0] + space
-                    char *s = matches[0];
-                    int already = plen;
-                    int extra   = strlen(s) - already;
-                    if (pos + extra + 1 < size) {
-                        memcpy(buf + pos, s + already, extra);
-                        pos += extra;
-                        buf[pos++] = ' ';
-                        write(STDOUT_FILENO, s + already, extra);
-                        write(STDOUT_FILENO, " ", 1);
-                    }
-                }
-                else if (mcount > 1) {
-                    // LCP of full completions
-                    int common = strlen(matches[0]);
-                    for (int i = 1; i < mcount; i++)
-                        common = common < (int)strspn(matches[i], matches[0])
-                               ? common
-                               : (int)strspn(matches[i], matches[0]);
-
-                    int already = plen;
-                    int extra   = common - already;
-                    if (extra > 0 && pos + extra < size) {
-                        memcpy(buf + pos, matches[0] + already, extra);
-                        pos += extra;
-                        write(STDOUT_FILENO, matches[0] + already, extra);
-                    } else {
-                        write(STDOUT_FILENO, "\a", 1);
-                    }
-                }
-                else {
-                    write(STDOUT_FILENO, "\a", 1);
-                }
-
-                tab_count = 1;
-            }
-            // — SECOND TAB: list all completions —
-            else {
-                write(STDOUT_FILENO, "\r\n", 2);
-                for (int i = 0; i < mcount; i++) {
-                    write(STDOUT_FILENO, matches[i], strlen(matches[i]));
-                    if (i + 1 < mcount)
-                        write(STDOUT_FILENO, "  ", 2);
-                }
-                write(STDOUT_FILENO, "\r\n", 2);
-                // re‑draw prompt + buffer
-                print_prompt();
-                write(STDOUT_FILENO, buf, pos);
-                fflush(stdout);
-
-                tab_count = 0;
-            }
-        }
-        // backspace or printable char
-        else {
-            if (c == 127 || c == '\b') {
-                if (pos > 0) {
-                    pos--;
-                    write(STDOUT_FILENO, "\b \b", 3);
-                }
-            }
-            else if (isprint((unsigned char)c) && pos + 1 < size) {
-                buf[pos++] = c;
-                write(STDOUT_FILENO, &c, 1);
-            }
-            tab_count = 0;
-        }
-    }
-
-    buf[pos] = '\0';
-    return pos;
-}
 
 
 int main(void){
@@ -459,28 +538,27 @@ int main(void){
         char *cmd = args[0];
         int stream=-1, index=-1;
         char *red_file=NULL, *red_op=NULL;
-        for(int i=0; args[i]; i++){
-            if(strcmp(args[i],">")==0   || strcmp(args[i],"1>")==0  ||
-               strcmp(args[i],">>")==0  || strcmp(args[i],"1>>")==0 )
+        for(int i=0;args[i];i++){
+            if(strcmp(args[i],">")==0 || strcmp(args[i],"1>")==0 || strcmp(args[i],">>")==0 || strcmp(args[i],"1>>")==0)
             {
-                stream   = 1;
-                index    = i;
-                red_op   = args[i];
+                stream = 1;
+                index = i;
+                red_op = args[i];
                 red_file = args[i+1];
                 break;
             }
             if(strcmp(args[i],"2>")==0  || strcmp(args[i],"2>>")==0 ){
-                stream   = 2;
-                index    = i;
-                red_op   = args[i];
+                stream = 2;
+                index = i;
+                red_op = args[i];
                 red_file = args[i+1];
                 break;
             }
 
             if(strcmp(args[i],"&>")==0  || strcmp(args[i],"&>>")==0 ){
-                stream   = 1;
-                index    = i;
-                red_op   = args[i];
+                stream = 1;
+                index = i;
+                red_op = args[i];
                 red_file = args[i+1];
                 break;
             }
@@ -508,76 +586,18 @@ int main(void){
         }
 
         if(strcmp(cmd,"exit")==0){
-            if(nargs>1 && strcmp(args[1],"0")==0) break;
+            disable_raw_mode();
+            return exit_cmd(args,nargs);
         }
         else if(strcmp(cmd,"cd")==0){
-            char *target = nargs>1 ? args[1] : getenv("HOME");
-            if(!target) target="/";
-            if(target[0]=='~'){
-                char hcp[300];
-                strcpy(hcp,getenv("HOME"));
-                strcat(hcp,target+1);
-                target=hcp;
-            }
-            if(chdir(target)!=0)
-                fprintf(stderr,"cd: %s: %s\n",target,strerror(errno));
-        }  
-        else if(strcmp(cmd,"pwd")==0){
-            if(nargs>1){
-            printf("pwd: Too many arguments");
-            }
-            else {
-                char cwd[300];
-                if(getcwd(cwd,sizeof(cwd))){
-                    printf("%s",cwd);
-                    if (builtin_saved == -1)
-                        write(STDOUT_FILENO, "\r\n", 2);
-                    else
-                        write(builtin_saved, "\r\n", 2);
-                }
-            }
+            cd(args,nargs);
         }
         else if(strcmp(cmd,"echo")==0){
-            for(int i=1;i<nargs;i++){
-                printf("%s",args[i]);
-                if(i+1<nargs) printf(" ");
-            }
-            write(STDOUT_FILENO, "\n", 1);
+            echo(args,nargs);
         }
 
         else if(strcmp(cmd,"type")==0){
-            char *t = nargs>1 ? args[1] : NULL;
-            int fb=0;
-            for(int i=0;i<5;i++){
-                if(t&&strcmp(t,builtins[i])==0){
-                    printf("%s is a shell builtin",t);
-                    write(STDOUT_FILENO, "\n", 1);
-                    fb=1;
-                    break;
-                }
-            }
-            if(!fb){
-                char *p2 = getenv("PATH");
-                char *cp2 = strdup(p2);
-                char *d  = strtok(cp2,":");
-                int fe=0;
-                while(d){
-                    char fp[300];
-                    strcpy(fp,d); strcat(fp,"/"); strcat(fp,t?t:"");
-                    if(t&&access(fp,X_OK)==0){
-                        printf("%s is %s",t,fp);
-                        write(STDOUT_FILENO, "\n", 1);
-                        fe=1;
-                        break;
-                    }
-                    d=strtok(NULL,":");
-                }
-                free(cp2);
-                if(!fe){
-                    printf("%s: not found",t?t:"");
-                    write(STDOUT_FILENO, "\n", 1);
-                }
-            }
+            type(args,nargs,builtins);
         }
         else {
             if(!runexec(args,stream,red_op,red_file)){
