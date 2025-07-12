@@ -347,10 +347,10 @@ ssize_t read_line(char *buf, size_t size, trienode *groot) {
 int exit_cmd(char **args, int nargs){
     if (nargs>1){
         if (strcmp(args[1],"0")==0){
-            return 1;
+            exit(0);
         }
     }
-    return 0;
+    return 1;
 }
 
 void cd(char **args,int nargs){
