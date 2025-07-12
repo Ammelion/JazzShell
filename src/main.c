@@ -673,10 +673,7 @@ int main(void){
                     redir r = redirect(cmd);
                     int sc = 0;
                     while (cmd[sc]) ++sc;
-                    int status = exelogic(cmd, sc,
-                                        STDIN_FILENO, STDOUT_FILENO,
-                                        builtins, len,
-                                        r.op, r.file, r.stream);
+                    int status = exelogic(cmd,sc,STDIN_FILENO, STDOUT_FILENO,builtins,len,r.op, r.file, r.stream);
                     restore_redirect(&r);
                     if (status != 0) {
                         disable_raw_mode();
