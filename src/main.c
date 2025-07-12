@@ -346,14 +346,7 @@ ssize_t read_line(char *buf, size_t size, trienode *groot) {
 
 int exit_cmd(char **args, int nargs){
     if (nargs>1){
-        char *end;
-        errno=0;
-        long val=strtol(args[1], &end, 10);
-        if (errno==0 && *end=='\0'){
-            return (int)val;
-        }
-        else{
-            fprintf(stderr,"exit: invalid numeric argument: %s\n",args[1]);
+        if (strcmp(args[1],"0")==0){
             return 1;
         }
     }
