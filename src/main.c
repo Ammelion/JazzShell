@@ -513,6 +513,11 @@ int exelogic(char **args,int nargs,int in_fd,int out_fd,char *builtins[],int bui
     else if(strcmp(cmd,"type")==0){
         type(args,nargs,builtins);
     }
+    
+    else if(strcmp(cmd,"pwd")==0){
+        pwd(nargs,builtin_count);
+        printf("\n");
+    }
     else {
         if(!runexec(args,stream,red_op,red_file)){
             printf("%s: command not found",cmd);
