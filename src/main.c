@@ -11,6 +11,14 @@
 #include <termios.h>
 #include <limits.h>
 
+typedef struct{ //code for redirection operators
+    int index;
+    int stream;
+    char *op;
+    char *file;
+    int sfd;
+} redir;
+
 typedef struct trienode
 {
     struct trienode *children[256];
@@ -428,7 +436,6 @@ void type(char **args, int nargs, char **builtins){
     }
 }
 
-
 int runexec(char **arr, int stream, char *red_op, char *red_file){ //if i "somehow" fail to find a builtin... maybe its in the executables list
     int found=0;
     char command[100];
@@ -475,9 +482,122 @@ int runexec(char **arr, int stream, char *red_op, char *red_file){ //if i "someh
     }
 }
 
+void padpipe(char *in){
+    char tmp[512],*w=tmp;
+    for (char *r=in; *r;r++) {
+        if (*r=='|'){
+            *w++=' ';
+            *w++='|';
+            *w++=' ';
+        }else{
+            *w++=*r;
+        }
+    }
+    *w='\0';
+    strcpy(in,tmp);
+}
 
+int exelogic(char **args,int nargs,int in_fd,int out_fd,char *builtins[],int builtin_count,char *red_op,char *red_file,int stream){
+    char *cmd=args[0];
+    if(strcmp(cmd,"exit")==0){
+        disable_raw_mode();
+        return exit_cmd(args,nargs);
+    }
+    else if(strcmp(cmd,"cd")==0){
+        cd(args,nargs);
+    }
+    else if(strcmp(cmd,"echo")==0){
+        echo(args,nargs);
+    }
+
+    else if(strcmp(cmd,"type")==0){
+        type(args,nargs,builtins);
+    }
+    else {
+        if(!runexec(args,stream,red_op,red_file)){
+            printf("%s: command not found",cmd);
+            write(STDOUT_FILENO, "\n", 1);
+        }
+    }
+    return 0;
+}
+
+int breakpipe(char **args,int nargs,char *stages[512][512]){
+    int in=0,xi=0;
+    for(int i=0;args[i];i++){
+        if(strcmp(args[i],"|")==0){
+            stages[in][xi]=NULL;
+            in++;xi=0;
+        }
+        else{
+            stages[in][xi++]=args[i];
+        }
+    }
+    stages[in][xi]=NULL;
+    return in;
+}
+
+redir redirect(char **args){
+    redir t={
+        .index=-1,
+        .stream=1,
+        .op=NULL,
+        .file=NULL,
+        .sfd=-1
+    };
+
+    for(int i=0; args[i]; i++){
+        if(strcmp(args[i],">")==0 || strcmp(args[i],"1>")==0 || strcmp(args[i],">>")==0 || strcmp(args[i],"1>>")==0){
+                t.stream=1;
+                t.index=i;
+                t.op=args[i];
+                t.file=args[i+1];
+                break;
+        }
+        if(strcmp(args[i],"2>")==0  || strcmp(args[i],"2>>")==0){
+                t.stream=2;
+                t.index=i;
+                t.op=args[i];
+                t.file=args[i+1];
+                break;
+        }
+        if(strcmp(args[i],"&>")==0  || strcmp(args[i],"&>>")==0){
+                t.stream = 1;
+                t.index = i;
+                t.op = args[i];
+                t.file = args[i+1];
+                break;
+        }
+    }
+    if (t.index!=-1){
+        int flags=O_WRONLY | O_CREAT | (strstr(t.op, ">>") ? O_APPEND : O_TRUNC);
+        int fd=open(t.file, flags, 0666);
+        if(fd<0){
+            perror(t.file);
+        }
+        else{
+            t.sfd=dup(t.stream);
+            dup2(fd,t.stream);
+            if (strcmp(t.op, "&>")==0 || strcmp(t.op, "&>>")==0)
+                dup2(fd,2);
+            close(fd);
+
+            args[t.index] = NULL;
+        }
+    }
+    return t;
+}
+
+void restore_redirect(redir *t){
+    if(t->sfd != -1){
+        dup2(t->sfd,t->stream);
+        close(t->sfd);
+    }
+}
 
 int main(void){
+    int in_fd  = STDIN_FILENO;
+    int out_fd = STDOUT_FILENO;
     setbuf(stdout,NULL);
     char *args[100],len=0;
     trienode *sroot =NULL;
@@ -527,87 +647,52 @@ int main(void){
 
         char input[100];
         read_line(input,sizeof input, groot);
+        padpipe(input);
         int nargs = parser(input,args);
-
 
         if(nargs==0){
             enable_raw_mode();
             continue;
         }
 
-        char *cmd = args[0];
-        int stream=-1, index=-1;
-        char *red_file=NULL, *red_op=NULL;
-        for(int i=0;args[i];i++){
-            if(strcmp(args[i],">")==0 || strcmp(args[i],"1>")==0 || strcmp(args[i],">>")==0 || strcmp(args[i],"1>>")==0)
-            {
-                stream = 1;
-                index = i;
-                red_op = args[i];
-                red_file = args[i+1];
-                break;
-            }
-            if(strcmp(args[i],"2>")==0  || strcmp(args[i],"2>>")==0 ){
-                stream = 2;
-                index = i;
-                red_op = args[i];
-                red_file = args[i+1];
-                break;
-            }
-
-            if(strcmp(args[i],"&>")==0  || strcmp(args[i],"&>>")==0 ){
-                stream = 1;
-                index = i;
-                red_op = args[i];
-                red_file = args[i+1];
-                break;
+        char *stages[512][512];
+        redir r;
+        int nos=breakpipe(args,nargs,stages)+1;
+        int fds[2 * (nos - 1)];
+        for (int i = 0; i < nos - 1; ++i) {
+            if (pipe(fds + 2*i) < 0) {
+                perror("pipe");
+                exit(1);
             }
         }
-
-        int builtin_saved=-1;
-        if(red_file){
-            int flags = O_WRONLY|O_CREAT
-                      | (strstr(red_op, ">>") ? O_APPEND : O_TRUNC);
-            int fd = open(red_file, flags, 0666);
-            if(fd<0){
-                perror(red_file);
-            } else {
-                builtin_saved=dup(stream);
-                dup2(fd,stream);
-                if(strcmp(red_op,"&>")==0 || strcmp(red_op,"&>>")==0)
-                    dup2(fd,2);
-                close(fd);
+        for (int i = 0; i < nos; ++i) {
+            pid_t pid = fork();
+            if (pid < 0) {
+                perror("fork");
+                exit(1);
+            }
+            if (pid == 0) {
+                if (i > 0) {
+                    dup2(fds[2*(i-1)], STDIN_FILENO);
+                }
+                if (i < nos - 1) {
+                    dup2(fds[2*i + 1], STDOUT_FILENO);
+                }
+                for (int j = 0; j < 2*(nos - 1); ++j) {
+                    close(fds[j]);
+                }
+                redir r = redirect(stages[i]);
+                int sc = 0;
+                while (stages[i][sc]) ++sc;
+                exelogic(stages[i], sc, STDIN_FILENO, STDOUT_FILENO,builtins, len, r.op, r.file, r.stream);
+                exit(0);
             }
         }
-
-        if(index!=-1){
-            args[index]=NULL;
-            nargs = index;
+        for (int j = 0; j < 2*(nos - 1); ++j) {
+            close(fds[j]);
         }
-
-        if(strcmp(cmd,"exit")==0){
-            disable_raw_mode();
-            return exit_cmd(args,nargs);
-        }
-        else if(strcmp(cmd,"cd")==0){
-            cd(args,nargs);
-        }
-        else if(strcmp(cmd,"echo")==0){
-            echo(args,nargs);
-        }
-
-        else if(strcmp(cmd,"type")==0){
-            type(args,nargs,builtins);
-        }
-        else {
-            if(!runexec(args,stream,red_op,red_file)){
-                printf("%s: command not found",cmd);
-                write(STDOUT_FILENO, "\n", 1);
-            }
-        }
-        if(builtin_saved!=-1){
-            dup2(builtin_saved,stream);
-            close(builtin_saved);
+        for (int i = 0; i < nos; ++i) {
+            wait(NULL);
         }
         fflush(stdout);
         enable_raw_mode();
