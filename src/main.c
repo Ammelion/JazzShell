@@ -658,6 +658,37 @@ int main(void){
         char *stages[512][512];
         redir r;
         int nos=breakpipe(args,nargs,stages)+1;
+
+        if (nos == 1) {
+            char **cmd = stages[0];
+            if (cmd[0]) {
+                int bi = -1;
+                for (int i = 0; builtins[i]; ++i) {
+                    if (strcmp(cmd[0], builtins[i]) == 0) {
+                        bi = i;
+                        break;
+                    }
+                }
+                if (bi >= 0) {
+                    redir r = redirect(cmd);
+                    int sc = 0;
+                    while (cmd[sc]) ++sc;
+                    int status = exelogic(cmd, sc,
+                                        STDIN_FILENO, STDOUT_FILENO,
+                                        builtins, len,
+                                        r.op, r.file, r.stream);
+                    restore_redirect(&r);
+                    if (status != 0) {
+                        disable_raw_mode();
+                        return status;
+                    }
+                    fflush(stdout);
+                    enable_raw_mode();
+                    continue;
+                }
+            }
+        }
+
         int fds[2 * (nos - 1)];
         for (int i = 0; i < nos - 1; ++i) {
             if (pipe(fds + 2*i) < 0) {
