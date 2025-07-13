@@ -382,6 +382,18 @@ ssize_t read_line(char *buf, size_t size, trienode *groot) {
 }
 
 int exit_cmd(char **args, int nargs){
+    const char *histpath = getenv("HISTFILE");
+    if (histpath) {
+        FILE *f = fopen(histpath, "a");
+        if (f){
+        histnode *n = last_append ? last_append->next : head;
+        while (n){
+            fprintf(f, "%s\n", n->command);
+            n = n->next;
+        }
+        fclose(f);
+        }
+    }
     if (nargs>1){
         if (strcmp(args[1],"0")==0){
             exit(0);
@@ -730,6 +742,19 @@ int main(void){
     char *builtins[]={"echo","exit","type","pwd","cd","history",NULL};
     while(builtins[len]){len++;}
 
+    const char *histpath = getenv("HISTFILE");
+    if (histpath) {
+    FILE *f = fopen(histpath, "r");
+    if (f) {
+        char *line = NULL; size_t cap = 0;
+        while (getline(&line, &cap, f) > 0) {
+            line[strcspn(line, "\n")] = '\0';
+            if (*line) addhist(line);
+            }
+        free(line);
+        fclose(f);
+        }
+    }
     for(int i=0;i<len;i++){
         trieinsert(&sroot,builtins[i]);
     }
