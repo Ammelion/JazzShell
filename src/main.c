@@ -384,16 +384,16 @@ ssize_t read_line(char *buf, size_t size, trienode *groot) {
 int exit_cmd(char **args, int nargs){
     const char *histpath = getenv("HISTFILE");
     if (histpath) {
-        FILE *f = fopen(histpath, "a");
-        if (f) {
+    FILE *f = fopen(histpath, "a");      // open for appending
+    if (f){
         histnode *n = last_append ? last_append->next : head;
-        while (n) {
+        for (; n; n = n->next) {
             fprintf(f, "%s\n", n->command);
-            n = n->next;
         }
         fclose(f);
         }
     }
+
     if (nargs>1){
         if (strcmp(args[1],"0")==0){
             exit(0);
