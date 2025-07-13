@@ -540,7 +540,7 @@ int breakpipe(char **args,int nargs,char *stages[512][512]){
     }
     stages[in][xi]=NULL;
     return in;
-}
+} 
 
 redir redirect(char **args){
     redir t={
