@@ -655,7 +655,7 @@ int history(int nargs, char **args){
         return 0;
     }
 
-    if (nargs == 3 && strcmp(args[1], "-a") == 0) {
+    else if (nargs == 3 && strcmp(args[1], "-a") == 0) {
         const char *path=args[2];
         FILE *f=fopen(path,"a");
         if (!f) {
