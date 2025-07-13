@@ -1,4 +1,3 @@
-````markdown
 # Jazz Shell
 
 [![Build Status](https://img.shields.io/github/actions/workflow/status/yourusername/jazz-shell/ci.yml?branch=master)](https://github.com/yourusername/jazz-shell/actions)  
