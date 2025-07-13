@@ -27,9 +27,9 @@ histnode *head=NULL;
 histnode *tail=NULL;
 histnode *current=NULL;
 
-char histpath[512];
 int status;
 int history(int nargs, char **args);
+void addhist(const char *line);
 
 typedef struct trienode
 {
@@ -633,69 +633,48 @@ void restore_redirect(redir *t){
 }
 
 int history(int nargs, char **args){
-    FILE *hf=fopen(histpath,"r");
-
-    if(!hf){
-        return 0;
-    }
-
-    if(nargs==1){
-        char *line=NULL;
-        size_t len=0;
-        int num=1;
-        while (getline(&line,&len,hf)>0){
-            printf(" %4d  %s", num++, line);
+    histnode *n=head;
+    int idx=1;
+    if (nargs==1){
+        while(n){
+            printf(" %4d  %s\n",idx++,n->command);
+            n = n->next;
         }
-        free(line);
     }
-
-    else if (nargs==2){
-        int N = atoi(args[1]);
-        if (N <= 0) return 0;
-
-        // First, count total lines
-        int total = 0;
+    else if (strcmp(args[1],"-r")==0 && nargs==3){
+        const char *path = args[2];
+        FILE *f = fopen(path, "r");
+        if (!f) {
+            perror(path);
+            return 0;
+        }
         char *line = NULL;
-        size_t len = 0;
-        rewind(hf);
-        while (getline(&line, &len, hf) > 0) total++;
-        free(line);
-
-        // Compute the starting line
-        int start = total > N ? total - N : 0;
-        rewind(hf);
-        int idx = 0;
-        line = NULL; len = 0;
-        while (getline(&line, &len, hf) > 0) {
-            if (idx++ >= start) {
-                printf(" %4d  %s", idx, line);
+        size_t cap = 0;
+        while (getline(&line, &cap, f) > 0) {
+            line[strcspn(line, "\n")] = '\0';
+            if (*line) {
+                addhist(line);
             }
         }
         free(line);
+        fclose(f);
+        return 0;
     }
-    fclose(hf);
-    return 0;
-}
+    else if (nargs == 2){
+        int N = atoi(args[1]);
+        if (N <= 0) return 0;
+        int total = 0;
+        for (histnode *t = head; t; t = t->next) total++;
+        int skip = total > N ? total - N : 0;
+        n = head;
+        while (skip-- > 0) n = n->next;
 
-void loadhist(void){
-    FILE *f=fopen(histpath,"r");
-    if (!f)return;
-    char *buf=NULL; 
-    size_t cap=0;
-    while (getline(&buf,&cap,f)>0){
-        buf[strcspn(buf,"\n")]='\0';
-        histnode *n=malloc(sizeof *n);
-        n->command=strdup(buf);
-        n->prev=tail;
-        n->next=NULL;
-        if (tail)tail->next = n;
-        else{
-            head = n;
+        while (n) {
+            printf(" %4d  %s\n", idx++, n->command);
+            n = n->next;
         }
-        tail = n;
     }
-    free(buf);
-    fclose(f);
+    return 0;
 }
 
 void addhist(const char *line) {
@@ -726,12 +705,6 @@ int main(void){
     }
     enable_raw_mode();
 
-    //history generation
-    char *home=getenv("HOME");
-    snprintf(histpath, sizeof(histpath), "%s/.jazz_history", home);  
-    FILE *hf_init = fopen(histpath, "w");
-    if (hf_init) fclose(hf_init);
-    
     while(1){
         print_prompt();
         //i MUST initiate the stupid autocompletion part ;p
@@ -772,16 +745,11 @@ int main(void){
         char input[100],sinput[100];
         read_line(input,sizeof input, groot);
         strcpy(sinput,input);
-        if(sinput){addhist(sinput); current=NULL;}
-
-        if (sinput[0] != '\0') {
-            FILE *hf = fopen(histpath, "a");
-            if (hf) {
-                fputs(sinput, hf);
-                fputc('\n', hf);
-                fclose(hf);
-            }
+        if(sinput[0] != '\0'){
+            addhist(sinput); 
+            current=NULL;
         }
+
         padpipe(input);
         int nargs = parser(input,args);
 
