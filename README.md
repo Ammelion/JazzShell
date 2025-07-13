@@ -1,34 +1,47 @@
-[![progress-banner](https://backend.codecrafters.io/progress/shell/065b55df-29ae-4cb2-b5dd-0e7a86b9ffd1)](https://app.codecrafters.io/users/Ammelion?r=2qF)
+````markdown
+# Jazz Shell
 
-This is a starting point for C solutions to the
-["Build Your Own Shell" Challenge](https://app.codecrafters.io/courses/shell/overview).
+[![Build Status](https://img.shields.io/github/actions/workflow/status/yourusername/jazz-shell/ci.yml?branch=master)](https://github.com/yourusername/jazz-shell/actions)  
+[![License](https://img.shields.io/github/license/yourusername/jazz-shell)](LICENSE)
 
-In this challenge, you'll build your own POSIX compliant shell that's capable of
-interpreting shell commands, running external programs and builtin commands like
-cd, pwd, echo and more. Along the way, you'll learn about shell command parsing,
-REPLs, builtin commands, and more.
+A minimal UNIX-style shell featuring:
 
-**Note**: If you're viewing this repo on GitHub, head over to
-[codecrafters.io](https://codecrafters.io) to try the challenge.
+- **Persistent history** (`history -r/-w/-a`, `$HISTFILE`)  
+- **Tab-completion** for builtins, files, and `$PATH` programs  
+- **Builtins**: `cd`, `pwd`, `echo`, `type`, `history`, `exit`  
+- **Pipelines & I/O**: `|`, `>`, `>>`, `2>`, `&>`
 
-# Passing the first stage
+---
 
-The entry point for your `shell` implementation is in `src/main.c`. Study and
-uncomment the relevant code, and push your changes to pass the first stage:
+## Build & Install
 
-```sh
-git commit -am "pass 1st stage" # any msg
-git push origin master
+```bash
+git clone https://github.com/yourusername/jazz-shell.git
+cd jazz-shell
+make              # builds `jazz`
+sudo make install # installs to /usr/local/bin
+````
+
+## Quick Start
+
+```bash
+export HISTFILE=~/.jazz_history
+jazz
+$ echo Hello
+Hello
+$ ls | grep .c > list.txt
+$ history -w $HISTFILE
+$ exit 0
 ```
 
-Time to move on to the next stage!
+## Configuration
 
-# Stage 2 & beyond
+* **`$HISTFILE`**: path to load/save history
+* **Auto-save**: history is appended on `exit` if `$HISTFILE` is set
 
-Note: This section is for stages 2 and beyond.
+## License
 
-1. Ensure you have `cmake` installed locally
-1. Run `./your_program.sh` to run your program, which is implemented in
-   `src/main.c`.
-1. Commit your changes and run `git push origin master` to submit your solution
-   to CodeCrafters. Test output will be streamed to your terminal.
+MIT © [yourusername](https://github.com/yourusername)
+
+```
+```
