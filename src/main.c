@@ -722,6 +722,21 @@ void addhist(const char *line) {
 
 
 int main(void){
+    const char *histpath = getenv("HISTFILE");
+    if (histpath) {
+    FILE *f = fopen(histpath, "r");
+    if (f) {
+        char *line = NULL;
+        size_t cap = 0;
+        while (getline(&line, &cap, f) > 0) {
+        line[strcspn(line, "\n")] = '\0';
+        if (*line) addhist(line);
+        }
+        free(line);
+        fclose(f);
+        }
+    }
+
     int in_fd  = STDIN_FILENO;
     int out_fd = STDOUT_FILENO;
     setbuf(stdout,NULL);
@@ -828,7 +843,7 @@ int main(void){
         }
         for (int i = 0; i < nos; ++i) {
             pid_t pid = fork();
-            if (pid < 0) {
+            if (pid < 0) { //
                 perror("fork");
                 exit(1);
             }
