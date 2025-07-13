@@ -675,6 +675,14 @@ int main(void){
         char input[100],sinput[100];
         read_line(input,sizeof input, groot);
         strcpy(sinput,input);
+        if (sinput[0] != '\0') {
+            FILE *hf = fopen(histpath, "a");
+            if (hf) {
+                fputs(sinput, hf);
+                fputc('\n', hf);
+                fclose(hf);
+            }
+        }
         padpipe(input);
         int nargs = parser(input,args);
 
@@ -709,15 +717,6 @@ int main(void){
                     }
                     fflush(stdout);
                     enable_raw_mode();
-
-                    if(sinput[0] != '\0'){
-                        FILE *hf=fopen(histpath,"a");
-                        if(hf){
-                            fputs(sinput,hf);
-                            fputc('\n',hf);
-                            fclose(hf);
-                        }
-                    }
                     continue;
                 }
             }
@@ -759,14 +758,6 @@ int main(void){
         int wstatus;
         for (int i = 0; i < nos; ++i) {
             wait(&wstatus);
-        }
-        if (sinput[0] != '\0') {
-            FILE *hf = fopen(histpath, "a");
-            if (hf) {
-                fputs(sinput, hf);
-                fputc('\n', hf);
-                fclose(hf);
-            }
         }
         fflush(stdout);
         enable_raw_mode();
