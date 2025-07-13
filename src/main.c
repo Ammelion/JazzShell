@@ -9,9 +9,8 @@
 #include <stdbool.h>
 #include <dirent.h>
 #include <termios.h>
-#include <limits.h>
 
-typedef struct{ //code for redirection operators
+typedef struct{ //stuct for redirection operators
     int index;
     int stream;
     char *op;
@@ -19,13 +18,17 @@ typedef struct{ //code for redirection operators
     int sfd;
 } redir;
 
+char histpath[512];
+int status;
+int history();
+
 typedef struct trienode
 {
     struct trienode *children[256];
     bool terminal;
 } trienode;
 
-struct termios orig, raw; //autocompletion stuff
+struct termios orig, raw; //input buffer, custom input parsing ahh
 
 trienode *createnode(){ 
     trienode *newnode = malloc(sizeof *newnode);
@@ -103,6 +106,7 @@ bool usufix(trienode *node, char *outbuf) {
     int count = dfs(node, outbuf, 0);
     return (count == 1);
 }
+//--- search logic for autocompletion ends here-- trust
 
 void enable_raw_mode(){
     tcgetattr(STDIN_FILENO, &orig);
@@ -197,7 +201,7 @@ int parser(char *input, char *args[]){  //this is the funny tokenizaton part, ch
     return count;
 }
 
-char *matches[256];
+char *matches[256]; // array that stores the matches, Frees after every iteration
 int mcount = 0;
 void collect(trienode *node, char *b, int depth) {
     if (node->terminal) {
@@ -394,11 +398,11 @@ void echo(char **args, int nargs){
     return;
 }
 
-void type(char **args, int nargs, char **builtins){
+void type(char **args, int nargs, char **builtins, int len){
     char *t = nargs>1 ? args[1] : NULL;
     int fb=0;
-    for(int i=0;i<5;i++){
-        if(t&&strcmp(t,builtins[i])==0){
+    for(int i=0;i<len;i++){
+        if(t && strcmp(t,builtins[i])==0){
             printf("%s is a shell builtin",t);
             write(STDOUT_FILENO, "\n", 1);
             fb=1;
@@ -490,7 +494,7 @@ void padpipe(char *in){
     strcpy(in,tmp);
 }
 
-int exelogic(char **args,int nargs,int in_fd,int out_fd,char *builtins[],int builtin_count,char *red_op,char *red_file,int stream){
+int exelogic(char **args,int nargs,int in_fd,int out_fd,char *builtins[],int builtin_count,char *red_op,char *red_file,int stream, int len){
     char *cmd=args[0];
     if(strcmp(cmd,"exit")==0){
         disable_raw_mode();
@@ -504,12 +508,15 @@ int exelogic(char **args,int nargs,int in_fd,int out_fd,char *builtins[],int bui
     }
 
     else if(strcmp(cmd,"type")==0){
-        type(args,nargs,builtins);
+        type(args,nargs,builtins,len);
     }
     
     else if(strcmp(cmd,"pwd")==0){
         pwd(nargs,builtin_count);
         printf("\n");
+    }
+    else if(strcmp(cmd,"history")==0){
+        return history();
     }
     else {
         if(!runexec(args,stream,red_op,red_file)){
@@ -593,19 +600,41 @@ void restore_redirect(redir *t){
     }
 }
 
+int history(void){
+    FILE *hf=fopen(histpath,"r");
+
+    if(!hf){
+        return 0;
+    }
+    char *line=NULL;
+    size_t len=0;
+    int num=1;
+    while (getline(&line,&len,hf)>0){
+        printf(" %4d  %s", num++, line);
+    }
+    free(line);
+    fclose(hf);
+    return 0;
+}
+
 int main(void){
     int in_fd  = STDIN_FILENO;
     int out_fd = STDOUT_FILENO;
     setbuf(stdout,NULL);
     char *args[100],len=0;
     trienode *sroot =NULL;
-    char *builtins[]={"echo","exit","type","pwd","cd",NULL};
+    char *builtins[]={"echo","exit","type","pwd","cd","history",NULL};
     while(builtins[len]){len++;}
 
     for(int i=0;i<len;i++){
         trieinsert(&sroot,builtins[i]);
     }
     enable_raw_mode();
+
+    //history generation
+    char *home=getenv("HOME");
+    snprintf(histpath, sizeof(histpath), "%s/.jazz_history", home);  
+
     while(1){
         print_prompt();
         //i MUST initiate the stupid autocompletion part ;p
@@ -643,8 +672,9 @@ int main(void){
             free(path_dup);
         }
 
-        char input[100];
+        char input[100],sinput[100];
         read_line(input,sizeof input, groot);
+        strcpy(sinput,input);
         padpipe(input);
         int nargs = parser(input,args);
 
@@ -657,13 +687,13 @@ int main(void){
         redir r;
         int nos=breakpipe(args,nargs,stages)+1;
 
-        if (nos == 1) {
-            char **cmd = stages[0];
-            if (cmd[0]) {
-                int bi = -1;
-                for (int i = 0; builtins[i]; ++i) {
-                    if (strcmp(cmd[0], builtins[i]) == 0) {
-                        bi = i;
+        if(nos==1){
+            char **cmd=stages[0];
+            if (cmd[0]){
+                int bi=-1;
+                for (int i=0;builtins[i];++i){
+                    if (strcmp(cmd[0],builtins[i])==0){
+                        bi=i;
                         break;
                     }
                 }
@@ -671,7 +701,7 @@ int main(void){
                     redir r = redirect(cmd);
                     int sc = 0;
                     while (cmd[sc]) ++sc;
-                    int status = exelogic(cmd,sc,STDIN_FILENO, STDOUT_FILENO,builtins,len,r.op, r.file, r.stream);
+                    int status = exelogic(cmd,sc,STDIN_FILENO, STDOUT_FILENO,builtins,len,r.op, r.file, r.stream, len);
                     restore_redirect(&r);
                     if (status != 0) {
                         disable_raw_mode();
@@ -679,6 +709,15 @@ int main(void){
                     }
                     fflush(stdout);
                     enable_raw_mode();
+
+                    if(status==0 && input[0] != '\0'){
+                        FILE *hf=fopen(histpath,"a");
+                        if(hf){
+                            fputs(sinput,hf);
+                            fputc('\n',hf);
+                            fclose(hf);
+                        }
+                    }
                     continue;
                 }
             }
@@ -710,15 +749,26 @@ int main(void){
                 redir r = redirect(stages[i]);
                 int sc = 0;
                 while (stages[i][sc]) ++sc;
-                exelogic(stages[i], sc, STDIN_FILENO, STDOUT_FILENO,builtins, len, r.op, r.file, r.stream);
+                exelogic(stages[i], sc, STDIN_FILENO, STDOUT_FILENO,builtins, len, r.op, r.file, r.stream, len);
                 exit(0);
             }
         }
         for (int j = 0; j < 2*(nos - 1); ++j) {
             close(fds[j]);
         }
+        int wstatus;
         for (int i = 0; i < nos; ++i) {
-            wait(NULL);
+            wait(&wstatus);
+            if (i == nos - 1 && WIFEXITED(wstatus) && WEXITSTATUS(wstatus) == 0) {
+                if (input[0] != '\0') {
+                    FILE *hf = fopen(histpath, "a");
+                    if (hf) {
+                        fputs(sinput, hf);
+                        fputc('\n', hf);
+                        fclose(hf);
+                    }
+                }
+            }
         }
         fflush(stdout);
         enable_raw_mode();
