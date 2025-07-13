@@ -641,6 +641,19 @@ int history(int nargs, char **args){
             n = n->next;
         }
     }
+    else if (nargs == 3 && strcmp(args[1], "-w") == 0) {
+        const char *path=args[2];
+        FILE *f = fopen(path,"w");
+        if (!f){
+            perror(path); return 0;
+        }
+        for (histnode *t=head;t;t=t->next){
+            fprintf(f, "%s\n", t->command);
+        }
+        fclose(f);
+        return 0;
+    }
+
     else if (strcmp(args[1],"-r")==0 && nargs==3){
         const char *path = args[2];
         FILE *f = fopen(path, "r");
