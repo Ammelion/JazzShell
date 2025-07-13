@@ -26,6 +26,7 @@ typedef struct histnode{ //struct for recalling history
 histnode *head=NULL;
 histnode *tail=NULL;
 histnode *current=NULL;
+histnode *last_append=NULL;
 
 int status;
 int history(int nargs, char **args);
@@ -651,6 +652,22 @@ int history(int nargs, char **args){
             fprintf(f, "%s\n", t->command);
         }
         fclose(f);
+        return 0;
+    }
+
+    if (nargs == 3 && strcmp(args[1], "-a") == 0) {
+        const char *path=args[2];
+        FILE *f=fopen(path,"a");
+        if (!f) {
+            perror(path);
+            return 0;
+        }
+        histnode *n = last_append ? last_append->next : head;
+        for (; n; n = n->next) {
+            fprintf(f, "%s\n", n->command);
+        }
+        fclose(f);
+        last_append = tail;
         return 0;
     }
 
