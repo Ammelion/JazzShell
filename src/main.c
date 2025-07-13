@@ -18,6 +18,15 @@ typedef struct{ //stuct for redirection operators
     int sfd;
 } redir;
 
+typedef struct histnode{ //struct for recalling history
+    char *command;
+    struct histnode *prev,*next;
+} histnode;
+
+histnode *head=NULL;
+histnode *tail=NULL;
+histnode *current=NULL;
+
 char histpath[512];
 int status;
 int history(int nargs, char **args);
@@ -247,6 +256,29 @@ ssize_t read_line(char *buf, size_t size, trienode *groot) {
     while (1) {
         char c;
         if (read(STDIN_FILENO, &c, 1) <= 0) return -1;
+
+        if (c == '\x1b') {
+        char seq[2];
+        if (read(STDIN_FILENO, seq, 2) != 2) continue;
+        if (seq[0]=='[' && seq[1]=='A') {         // UP
+            if (!current) current = tail;
+            else if (current->prev) 
+                current = current->prev;
+        }
+        else if (seq[0]=='[' && seq[1]=='B') {    // DOWN
+            if (current) current = current->next;
+        }
+
+        while (pos--) write(STDOUT_FILENO, "\b \b", 3);
+        if (current) {
+            strncpy(buf, current->command, size);
+            pos = strlen(buf);
+            write(STDOUT_FILENO, buf, pos);
+        } else {
+            buf[0]='\0'; pos=0;
+        }
+        continue;
+        }
 
         if (c == '\n' || c == '\r') {
             write(STDOUT_FILENO, "\r\n", 2);
@@ -645,6 +677,41 @@ int history(int nargs, char **args){
     return 0;
 }
 
+void loadhist(void){
+    FILE *f=fopen(histpath,"r");
+    if (!f)return;
+    char *buf=NULL; 
+    size_t cap=0;
+    while (getline(&buf,&cap,f)>0){
+        buf[strcspn(buf,"\n")]='\0';
+        histnode *n=malloc(sizeof *n);
+        n->command=strdup(buf);
+        n->prev=tail;
+        n->next=NULL;
+        if (tail)tail->next = n;
+        else{
+            head = n;
+        }
+        tail = n;
+    }
+    free(buf);
+    fclose(f);
+}
+
+void addhist(const char *line) {
+    if (!*line) return;
+    histnode *n=malloc(sizeof *n);
+    n->command=strdup(line);
+    n->prev=tail;
+    n->next=NULL;
+    if (tail) 
+        tail->next=n;
+    else
+        head = n;
+    tail = n;
+}
+
+
 int main(void){
     int in_fd  = STDIN_FILENO;
     int out_fd = STDOUT_FILENO;
@@ -705,6 +772,8 @@ int main(void){
         char input[100],sinput[100];
         read_line(input,sizeof input, groot);
         strcpy(sinput,input);
+        if(sinput){addhist(sinput); current=NULL;}
+
         if (sinput[0] != '\0') {
             FILE *hf = fopen(histpath, "a");
             if (hf) {
