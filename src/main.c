@@ -662,7 +662,9 @@ int main(void){
     //history generation
     char *home=getenv("HOME");
     snprintf(histpath, sizeof(histpath), "%s/.jazz_history", home);  
-
+    FILE *hf_init = fopen(histpath, "w");
+    if (hf_init) fclose(hf_init);
+    
     while(1){
         print_prompt();
         //i MUST initiate the stupid autocompletion part ;p
