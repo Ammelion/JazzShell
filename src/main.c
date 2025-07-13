@@ -748,7 +748,7 @@ int main(void){
         fclose(f);
         }
     }
-
+    last_append = tail;
     int in_fd  = STDIN_FILENO;
     int out_fd = STDOUT_FILENO;
     setbuf(stdout,NULL);
