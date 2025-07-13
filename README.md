@@ -1,8 +1,4 @@
 # Jazz Shell
-
-[![Build Status](https://img.shields.io/github/actions/workflow/status/yourusername/jazz-shell/ci.yml?branch=master)](https://github.com/yourusername/jazz-shell/actions)  
-[![License](https://img.shields.io/github/license/yourusername/jazz-shell)](LICENSE)
-
 A minimal UNIX-style shell featuring:
 
 - **Persistent history** (`history -r/-w/-a`, `$HISTFILE`)  
@@ -40,7 +36,7 @@ $ exit 0
 
 ## License
 
-MIT © [yourusername](https://github.com/yourusername)
+MIT © [Ammelion](https://github.com/Ammelion)
 
 ```
 ```
