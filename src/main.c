@@ -20,7 +20,7 @@ typedef struct{ //stuct for redirection operators
 
 char histpath[512];
 int status;
-int history();
+int history(int nargs, char **args);
 
 typedef struct trienode
 {
@@ -516,7 +516,7 @@ int exelogic(char **args,int nargs,int in_fd,int out_fd,char *builtins[],int bui
         printf("\n");
     }
     else if(strcmp(cmd,"history")==0){
-        return history();
+        return history(nargs,args);
     }
     else {
         if(!runexec(args,stream,red_op,red_file)){
@@ -600,19 +600,47 @@ void restore_redirect(redir *t){
     }
 }
 
-int history(void){
+int history(int nargs, char **args){
     FILE *hf=fopen(histpath,"r");
 
     if(!hf){
         return 0;
     }
-    char *line=NULL;
-    size_t len=0;
-    int num=1;
-    while (getline(&line,&len,hf)>0){
-        printf(" %4d  %s", num++, line);
+
+    if(nargs==1){
+        char *line=NULL;
+        size_t len=0;
+        int num=1;
+        while (getline(&line,&len,hf)>0){
+            printf(" %4d  %s", num++, line);
+        }
+        free(line);
     }
-    free(line);
+
+    else if (nargs==2){
+        int N = atoi(args[1]);
+        if (N <= 0) return 0;
+
+        // First, count total lines
+        int total = 0;
+        char *line = NULL;
+        size_t len = 0;
+        rewind(hf);
+        while (getline(&line, &len, hf) > 0) total++;
+        free(line);
+
+        // Compute the starting line
+        int start = total > N ? total - N : 0;
+        rewind(hf);
+        int idx = 0;
+        line = NULL; len = 0;
+        while (getline(&line, &len, hf) > 0) {
+            if (idx++ >= start) {
+                printf(" %4d  %s", idx, line);
+            }
+        }
+        free(line);
+    }
     fclose(hf);
     return 0;
 }
